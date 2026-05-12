@@ -1,7 +1,16 @@
+# Build output
+build/
+*.o
+*.obj
+
+# CUDA intermediate artifacts (already had these — good)
 *.i
 *.ii
 *.gpu
 *.ptx
 *.cubin
 *.fatbin
-*.clangd
+
+# Editor / LSP artifacts
+.cache/
+compile_commands.json

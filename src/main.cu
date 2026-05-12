@@ -1,6 +1,6 @@
 #include "cuda_utils.cuh"
 #include "mandelbrot.cuh"
-#include "utils.h"
+#include "io.h"
 
 #include <cstdlib>
 #include <vector>
@@ -25,7 +25,7 @@ void compute_mandelbrot(uint32_t img_size, uint32_t max_iters,
                         cudaMemcpyDeviceToHost));
 
   // Write output to binary file
-  write_binary(filename.c_str(), result.data(), img_size);
+  write_binary(filename, result.data(), img_size);
 
   CUDA_CHECK(cudaFree(resultd));
 }

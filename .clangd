@@ -1,0 +1,12 @@
+CompileFlags:
+  Add:
+    - --cuda-gpu-arch=sm_86
+    - -xcuda
+  Remove:
+    - -forward-unknown-to-host-compiler
+    - --generate-code*
+    - -Xcompiler*
+    - -Xcudafe*
+    - --expt-*
+    - -arch=*
+    - --options-file

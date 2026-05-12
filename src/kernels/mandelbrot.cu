@@ -4,8 +4,8 @@
 __global__ void mandelbrot(uint32_t img_size, uint32_t max_iters,
                            uint32_t *out) {
 
-  int row = blockIdx.x * blockDim.x + threadIdx.x;
-  int col = blockIdx.y * blockDim.y + threadIdx.y;
+  uint32_t row = blockIdx.y * blockDim.y + threadIdx.y;
+  uint32_t col = blockIdx.x * blockDim.x + threadIdx.x;
 
   if (row >= img_size || col >= img_size)
     return;
@@ -31,7 +31,7 @@ __global__ void mandelbrot(uint32_t img_size, uint32_t max_iters,
 void launch_mandelbrot(uint32_t img_size, uint32_t max_iters, uint32_t *out) {
 
   int tile_size = 32;
-  dim3 grid_dim(CEIL_DIV(img_size, tile_size), CEIL_DIV(img_size, tile_size));
+  dim3 grid_dim(ceil_div(img_size, tile_size), ceil_div(img_size, tile_size));
   dim3 block_dim(tile_size, tile_size);
 
   mandelbrot<<<grid_dim, block_dim>>>(img_size, max_iters, out);
