@@ -17,7 +17,11 @@ inline void cuda_check(cudaError_t code, const char *file, int line) {
     cuda_check((x), __FILE__, __LINE__);                                       \
   } while (0)
 
-template<typename A, typename B>
-constexpr auto ceil_div(A a, B b) {
-    return (a + b - 1) / b;
+#define CUDA_CHECK_LAUNCH()                                                    \
+  do {                                                                         \
+    cuda_check(cudaGetLastError(), __FILE__, __LINE__);                        \
+  } while (0)
+
+template <typename A, typename B> constexpr auto ceil_div(A a, B b) {
+  return (a + b - 1) / b;
 }

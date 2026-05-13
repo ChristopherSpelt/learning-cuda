@@ -1,8 +1,9 @@
 CompileFlags:
   Add:
     - --cuda-gpu-arch=sm_86
-    - -xcuda
     - -std=c++20
+    - -I/workspace/cuda-learning/include
+    - -I/usr/local/cuda/include
   Remove:
     - -forward-unknown-to-host-compiler
     - --generate-code*
@@ -10,4 +11,6 @@ CompileFlags:
     - -Xcudafe*
     - --expt-*
     - -arch=*
+    - -rdc=*
     - --options-file
+    - --options-file=*

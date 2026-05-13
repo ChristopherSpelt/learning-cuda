@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <limits>
+#include <span>
 #include <random>
 #include <vector>
 
@@ -21,22 +22,22 @@ inline std::vector<float> random_matrix(std::uint32_t rows, std::uint32_t cols,
   return out;
 }
 
-inline float relative_rmse(const std::vector<float> &a,
-                           const std::vector<float> &b) {
+inline float relative_rmse(std::span<const float> a,
+                           std::span<const float> b) {
   if (a.size() != b.size())
     return std::numeric_limits<float>::infinity();
 
   double mse = 0.0;
-  double ref_ms = 0.0;
+  double ref_sq_mean = 0.0;
   for (std::size_t i = 0; i < a.size(); ++i) {
     const double diff = double(a[i]) - double(b[i]);
     mse += diff * diff;
-    ref_ms += double(b[i]) * double(b[i]);
+    ref_sq_mean += double(b[i]) * double(b[i]);
   }
 
   mse /= double(a.size());
-  ref_ms /= double(a.size());
+  ref_sq_mean /= double(a.size());
 
-  return float(std::sqrt(mse) / std::sqrt(ref_ms));
+  return float(std::sqrt(mse) / std::sqrt(ref_sq_mean));
 }
 } // namespace numerics

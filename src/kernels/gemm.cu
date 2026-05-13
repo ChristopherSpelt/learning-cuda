@@ -18,7 +18,7 @@ __global__ void kernel(std::uint32_t M, std::uint32_t N, std::uint32_t K,
     C[row * N + col] = alpha * sum + beta * C[row * N + col];
 }
 
-template <int TILE = 32>
+template <int TILE>
 void launch(std::uint32_t M, std::uint32_t N, std::uint32_t K,
                        float alpha, float const *A, float const *B, float beta, float *C) {
 
@@ -26,6 +26,7 @@ void launch(std::uint32_t M, std::uint32_t N, std::uint32_t K,
   dim3 grid(ceil_div(N, TILE), ceil_div(M, TILE), 1);
 
   kernel<<<grid, block>>>(M, N, K, alpha, A, B, beta, C);
+  CUDA_CHECK_LAUNCH();
 }
 
 template void launch<32>(std::uint32_t M, std::uint32_t N, std::uint32_t K,
