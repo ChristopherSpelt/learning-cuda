@@ -4,6 +4,7 @@ project(cuda_learning C CXX CUDA)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CUDA_STANDARD 20)
+set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
@@ -12,11 +13,12 @@ endif()
 
 set(SOURCES
     src/main.cu
+    src/gemm_cpu.cpp
 )
 
 set(KERNELS
     src/kernels/mandelbrot.cu
-    src/kernels/matmul.cu
+    src/kernels/gemm.cu
 )
 
 add_executable(${CMAKE_PROJECT_NAME})
