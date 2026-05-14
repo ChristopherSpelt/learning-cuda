@@ -20,10 +20,10 @@ __global__ void shared_mem_kernel(std::uint32_t M, std::uint32_t N,
   auto global_row = block_row * BLOCKSIZE + thread_row;
   auto global_col = block_col * BLOCKSIZE + thread_col;
 
-  A += block_row * BLOCKSIZE * K;       // BLOCK: jump to my row stripe of A
-  B += block_col * BLOCKSIZE;           // BLOCK: jump to my col stripe of B
+  A += block_row * BLOCKSIZE * K; // BLOCK: jump to my row stripe of A
+  B += block_col * BLOCKSIZE;     // BLOCK: jump to my col stripe of B
   C += block_row * BLOCKSIZE * N +
-       block_col * BLOCKSIZE;           // BLOCK: jump to my tile in C
+       block_col * BLOCKSIZE; // BLOCK: jump to my tile in C
 
   float sum = 0.0f;
 
