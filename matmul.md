@@ -3,7 +3,10 @@
 I'm currently learning about CUDA. The canonical example used in learning is of course 
 matrix multiplication.
 
-As a guidance I'm using the excellent course [Accelerated Computing](https://accelerated-computing.academy/fall24/). 
+As a guidance I'm using the excellent resources:
+
+- [Accelerated Computing](https://accelerated-computing.academy/fall24/)
+- [Boehm's article](https://siboehm.com/articles/22/CUDA-MMM)
 
 ## Setup
 Assume we have matrices $A$ of size $n \times m$ and $B$ of size $m \times k$ for some positive
@@ -31,26 +34,63 @@ end for
 
 ## GPU
 
-The GPU we will use is a NVIDIA Tesla T4, because this is freely available through Google Colab.
-Specs for the GPU can be found here https://www.techpowerup.com/gpu-specs/tesla-t4.c3316. Relevant for
-us are
+The GPU we will use is a NVIDIA GeForce RTX 3090. Relevant specs for us are
 
-- Theoretical FLOPS for float32: 8.141 TFLOPS
-- DRAM bandwith: 320 GB/s
+- Peak float32 throughput: 35.58 TFLOPS
+- DRAM bandwith: 936.2 GB/s
 
 ## Some calculations
 
-Assume for this section that $n = m = k = 3072$. A first question we can ask ourselves is how many
-FLOPs are we computing in total. Looking at the formula and pseudocode above we can easily identify
-that for each entry of $C$ we need to compute a dot product of a vector of length $m$. Each such a 
-dot product hence has $m$ multiplications and $m-1$ additions. Hence in total there will be 
-$2m+1$ FLOPs per dot product and $nk$ of such dot products. Thus the total FLOPs for matrix multiplication
-will be of order $2nmk$.
+Assume for this section that $N = M = K = 3072$.
 
-Now let's see how many unique memory locations we are accessing. This is easy; we need to access each entry 
-of $A$ and $B$ and write it to each element of $C$. Thus there will be a total of $nm+mk+nk$ unique
-memory accesses. 
+### Compute
+
+Each entry of $C$ is a dot product of vectors of length $K$. A dot product between vectors of
+length $K$ takes $K$ multiplies and $K-1$ additions, so $2K - 1$ FLOPs. There are $MN$ such dot
+products, so the exact count is $MN(2K - 1)$, which is of order $2MNK$. Plugging in the numbers
+above gives
+
+$$
+2MNK = 2 \cdot 3072^3 \approx 58 \text{ GFLOP}.
+$$
+
+Dividing by the peak rate gives the compute-bound floor:
+
+$$
+\frac{58 \text{ GFLOP}}{35{,}580 \text{ GFLOP/s}} \approx 1.63 \text{ ms}.
+$$
+
+### Memory
+
+Elements of $A$ and $B$ must be loaded at least once, and elements of $C$ must be stored at least
+once. So the minimum number of unique memory accesses is $MK + KN + MN$. Each element is a float32
+(4 bytes), so the minimum DRAM traffic is
+
+$$
+4(MK + KN + MN) \text{ bytes}.
+$$
+
+For our size that is $4 \cdot 3 \cdot 3072^2 \approx 113 \text{ MB}$. Dividing by the DRAM
+bandwidth gives the memory-bound floor:
+
+$$
+\frac{0.113 \text{ GB}}{936.2 \text{ GB/s}} \approx 0.121 \text{ ms}.
+$$
 
 
-If we only need to access each unique memory location once and we would only be limited by the DRAM
-bandwith the fastest we could run is ....
+## Which floor binds?
+
+The compute floor is much larger than the memory floor, so for this problem size GEMM is *compute bound* 
+on the 3090. The arithmetic intensity of GEMM is
+
+$$
+\text{AI} = \frac{2MNK}{4(MK + KN + MN)} \approx 512 \text{ FLOP/byte},
+$$
+
+which is well above the 3090's *ridge point* of
+
+$$
+\frac{35.58 \text{ TFLOP/s}}{936.2 \text{ GB/s}} \approx 38 \text{ FLOP/byte}.
+$$
+
+Any workload with intensity above the ridge is compute-bound; below it, memory-bound.

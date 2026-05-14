@@ -20,7 +20,7 @@ set(SOURCES
 )
 
 set(KERNELS
-    src/kernels/gemm.cu
+    src/kernels/naive.cu
 )
 
 add_executable(${TARGET})

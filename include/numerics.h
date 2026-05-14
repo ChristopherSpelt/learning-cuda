@@ -1,9 +1,10 @@
 #pragma once
 
+#include <cmath>
 #include <cstdint>
 #include <limits>
-#include <span>
 #include <random>
+#include <span>
 #include <vector>
 
 namespace numerics {
