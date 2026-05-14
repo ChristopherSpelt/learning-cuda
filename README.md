@@ -5,6 +5,7 @@ matrix multiplication.
 
 As a guidance I'm using the excellent resources:
 
+- Programming Massively Parallel Processes
 - [Accelerated Computing](https://accelerated-computing.academy/fall24/)
 - [Boehm's article](https://siboehm.com/articles/22/CUDA-MMM)
 
@@ -94,3 +95,14 @@ $$
 $$
 
 Any workload with intensity above the ridge is compute-bound; below it, memory-bound.
+
+## Roofline
+
+![Roofline for RTX 3090](figures/roofline.svg)
+
+The diagonal (slope 1 on log-log axes) is the memory roof; its position
+is fixed by DRAM bandwidth. The horizontal dashed line is the peak FP32
+throughput. The two meet at the ridge point: arithmetic intensities
+above ≈ 38 FLOP/byte are compute-bound, below it memory-bound. GEMM at
+3072³ sits at AI ≈ 512, well past the ridge — the target is the
+35.58 TFLOP/s ceiling, not the bandwidth diagonal.

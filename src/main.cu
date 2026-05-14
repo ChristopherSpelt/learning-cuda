@@ -4,10 +4,11 @@
 #include <cstdlib>
 
 int main() {
-  GemmHarness harness(1024, 1024, 1024);
+  GemmHarness harness(3072, 3072, 3072);
 
   constexpr GemmKernel registry[] = {
       {"naive", &kernels::naive},
+      {"shared mem", &kernels::shared_mem},
   };
 
   for (const auto &k : registry) {
