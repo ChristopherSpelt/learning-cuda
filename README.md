@@ -5,9 +5,12 @@ matrix multiplication.
 
 As a guidance I'm using the excellent resources:
 
-- Programming Massively Parallel Processes
-- [Accelerated Computing](https://accelerated-computing.academy/fall24/)
 - [Boehm's article](https://siboehm.com/articles/22/CUDA-MMM)
+- [Accelerated Computing](https://accelerated-computing.academy/fall24/)
+- Programming Massively Parallel Processes
+
+We will mainly follow the steps of Boehm which seems to be the canonical reference with regards
+to matrix multiplication.
 
 ## Setup
 Assume we have matrices $A$ of size $M \times K$ and $B$ of size $K \times N$ for some positive
@@ -166,11 +169,11 @@ and each block is a $\text{BLOCKSIZE}\times\text{BLOCKSIZE}$ matrix. Consider th
 The picture shows the correspondence between the grid/block hierarchy and the global coordinates of $C$.
 A thread is uniquely identified by the triple `(blockIdx.y, blockIdx.x, threadIdx.x)` and is responsible
 for computing exactly one entrie $C_{i,j}$; the figure shows the mapping between the tripe to $(i,j)$. For
-ease of drawing we took $BLOCKSIZE=4$, but one should image it a $32$.
+ease of drawing we took $\text{BLOCKSIZE}=4$, but one should image it a $32$.
 
 Now consider a single warp: 32 consecutive threads in the block with `threadIdx.x` in $\{0,1,\dots,31\}$.
-With $BLOCKSIZE=32$ the row major linearization gives all of them `thread_row = 0` and `thread_col` running
-over $\{0,1,/dots,31\}$. So one warp is exactly one row of the thread block. Translated to global coordinates:
+With $\text{BLOCKSIZE}=32$ the row major linearization gives all of them `thread_row = 0` and `thread_col` running
+over $\{0,1,\dots,31\}$. So one warp is exactly one row of the thread block. Translated to global coordinates:
 the 32 threads of the warp share the same row index $i$, and their column indices $j, j+1, \dots, j+ 31$ are
 32 consecutive integers. The data they collectively need is therefore one row of $A$ and 32 consecutive columns
 of $B$.

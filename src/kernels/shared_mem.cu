@@ -1,7 +1,7 @@
 #include "cuda_utils.cuh"
 #include "kernels.h"
 
-template <std::uint32_t BLOCKSIZE>
+template <const std::uint32_t BLOCKSIZE>
 __global__ void shared_mem_kernel(std::uint32_t M, std::uint32_t N,
                                   std::uint32_t K, float alpha,
                                   const float *__restrict__ A,

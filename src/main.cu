@@ -9,6 +9,7 @@ int main() {
   constexpr GemmKernel registry[] = {
       {"naive", &kernels::naive},
       {"shared mem", &kernels::shared_mem},
+      {"shared mem 1D block", &kernels::shared_mem_1d_block},
   };
 
   for (const auto &k : registry) {
