@@ -22,6 +22,9 @@ set(SOURCES
 set(KERNELS
     src/kernels/naive.cu
     src/kernels/shared_mem.cu
+    src/kernels/shared_mem_1d_block.cu
+    src/kernels/shared_mem_2d_block.cu
+    src/kernels/shared_mem_vec.cu
 )
 
 add_executable(${TARGET})
