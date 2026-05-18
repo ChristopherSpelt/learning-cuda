@@ -110,7 +110,7 @@ __global__ void shared_mem_vec_kernel(std::uint32_t M, std::uint32_t N,
 void kernels::shared_mem_vec(std::uint32_t M, std::uint32_t N, std::uint32_t K,
                              float alpha, const float *A, const float *B,
                              float beta, float *C) {
-  constexpr int BM = 64, BK = 8, BN = 64, TM = 8, TN = 8;
+  constexpr int BM = 128, BK = 8, BN = 128, TM = 8, TN = 8;
   constexpr int THREADS = (BN * BM) / (TM * TN);
 
   dim3 block(THREADS);
