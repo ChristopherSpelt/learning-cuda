@@ -13,7 +13,7 @@ inline std::vector<float> random_matrix(std::uint32_t rows, std::uint32_t cols,
                                         std::uint32_t seed) {
 
   std::mt19937 gen(seed);
-  std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
+  std::normal_distribution<float> dist(0.0f, 1.0f);
 
   std::vector<float> out(std::size_t(rows) * cols);
   for (auto &x : out) {
@@ -23,8 +23,7 @@ inline std::vector<float> random_matrix(std::uint32_t rows, std::uint32_t cols,
   return out;
 }
 
-inline float relative_rmse(std::span<const float> a,
-                           std::span<const float> b) {
+inline float relative_rmse(std::span<const float> a, std::span<const float> b) {
   if (a.size() != b.size())
     return std::numeric_limits<float>::infinity();
 

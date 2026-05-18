@@ -4,7 +4,7 @@
 #include <cstdlib>
 
 int main() {
-  GemmHarness harness(3072, 3072, 3072);
+  GemmHarness harness(4096, 4096, 4096);
 
   constexpr GemmKernel registry[] = {
       {"naive", &kernels::naive},
