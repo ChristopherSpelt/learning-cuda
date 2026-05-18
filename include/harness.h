@@ -71,7 +71,7 @@ public:
 private:
   static constexpr float kAlpha = 1.0f;
   static constexpr float kBeta = 0.5f;
-  static constexpr float kTolerance = 1e-5f;
+  static constexpr float kTolerance = 1e-3f;
 
   std::uint32_t M_, N_, K_;
   std::vector<float> A_, B_, C_init_, C_ref_, C_scratch_;

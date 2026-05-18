@@ -9,7 +9,8 @@ int main() {
 
   constexpr GemmKernel registry[] = {
       {"cuBLAS (FP32 strict)", &kernels::cublas_pedantic},
-      {"cuBLAS (TF32 allowed)", &kernels::cublas_default},
+      {"cuBLAS (default)", &kernels::cublas_default},
+      {"cuBLAS (TF32 allowed)", &kernels::cublas_tf32},
       {"naive", &kernels::naive},
       {"shared mem", &kernels::shared_mem},
       {"shared mem 1D block", &kernels::shared_mem_1d_block},
