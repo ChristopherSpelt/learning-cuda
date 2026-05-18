@@ -1,3 +1,4 @@
+#include "gemm_cublas.h"
 #include "harness.h"
 #include "kernels.h"
 
@@ -7,6 +8,8 @@ int main() {
   GemmHarness harness(4096, 4096, 4096);
 
   constexpr GemmKernel registry[] = {
+      {"cuBLAS (FP32 strict)", &kernels::cublas_pedantic},
+      {"cuBLAS (TF32 allowed)", &kernels::cublas_default},
       {"naive", &kernels::naive},
       {"shared mem", &kernels::shared_mem},
       {"shared mem 1D block", &kernels::shared_mem_1d_block},

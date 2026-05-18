@@ -8,6 +8,8 @@ endif()
 
 project(${TARGET} C CXX CUDA)
 
+find_package(CUDAToolkit REQUIRED)
+
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CUDA_STANDARD 20)
@@ -16,10 +18,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(SOURCES
     src/main.cu
-    src/gemm_cpu.cpp
 )
 
 set(KERNELS
+    src/kernels/cublas.cu
     src/kernels/naive.cu
     src/kernels/shared_mem.cu
     src/kernels/shared_mem_1d_block.cu
@@ -35,6 +37,8 @@ target_sources(${TARGET} PRIVATE
 )
 
 target_include_directories(${TARGET} PRIVATE include)
+
+target_link_libraries(${TARGET} PRIVATE CUDA::cublas)
 
 set_target_properties(${TARGET} PROPERTIES
     CUDA_SEPARABLE_COMPILATION ON
