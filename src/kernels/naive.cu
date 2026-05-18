@@ -5,10 +5,10 @@ template <const std::uint32_t BLOCKSIZE>
 __global__ void naive_kernel(std::uint32_t M, std::uint32_t N, std::uint32_t K,
                              float alpha, const float *__restrict__ A,
                              const float *__restrict__ B, float beta,
-                             float* __restrict__ C) {
+                             float *__restrict__ C) {
 
   const std::uint32_t row = blockIdx.y * BLOCKSIZE + (threadIdx.x / BLOCKSIZE);
-  const std::uint32_t col = blockIdx.x * BLOCKSIZE + (threadIdx.x % BLOCKSIZE); 
+  const std::uint32_t col = blockIdx.x * BLOCKSIZE + (threadIdx.x % BLOCKSIZE);
 
   if (row >= M || col >= N)
     return;
@@ -18,7 +18,11 @@ __global__ void naive_kernel(std::uint32_t M, std::uint32_t N, std::uint32_t K,
     sum += A[row * K + k] * B[k * N + col];
   }
 
-  C[row * N + col] = alpha * sum + beta * C[row * N + col];
+  if (beta == 0.0f) {
+    C[row * N + col] = alpha * sum;
+  } else {
+    C[row * N + col] = alpha * sum + beta * C[row * N + col];
+  }
 }
 
 void kernels::naive(std::uint32_t M, std::uint32_t N, std::uint32_t K,

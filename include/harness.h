@@ -41,13 +41,9 @@ public:
     auto *Bd_ptr = thrust::raw_pointer_cast(Bd_.data());
     auto *Cd_ptr = thrust::raw_pointer_cast(Cd_.data());
 
-    auto launch = [&] {
-      kernel.launch(M_, N_, K_, kAlpha, Ad_ptr, Bd_ptr, kBeta, Cd_ptr);
-    };
-
-    // Reset C, run once, check correctness against the cached reference.
+    // Correctness: full αAB + βC against the cuBLAS reference.
     thrust::copy(C_init_.begin(), C_init_.end(), Cd_.begin());
-    launch();
+    kernel.launch(M_, N_, K_, kAlpha, Ad_ptr, Bd_ptr, kBeta, Cd_ptr);
     CUDA_CHECK(cudaDeviceSynchronize());
     thrust::copy(Cd_.begin(), Cd_.end(), C_scratch_.begin());
 
@@ -58,9 +54,11 @@ public:
       return;
     }
 
-    // Reset C, benchmark. Kernel accumulates into C each iter; that's fine for
-    // timing (work is identical), and values stay bounded.
-    thrust::copy(C_init_.begin(), C_init_.end(), Cd_.begin());
+    // Benchmark with β=0: each launch overwrites C, no contraction map.
+    // FLOP count is identical.
+    auto launch = [&] {
+      kernel.launch(M_, N_, K_, kAlpha, Ad_ptr, Bd_ptr, 0.0f, Cd_ptr);
+    };
     const auto result = bench::run(launch, bench::gemm_flops(M_, N_, K_));
 
     std::printf("%-22.*s  rel RMSE %.2e  %8.3f ms  %7.2f TFLOPS\n",

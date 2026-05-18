@@ -47,8 +47,12 @@ __global__ void shared_mem_kernel(std::uint32_t M, std::uint32_t N,
     }
     __syncthreads();
   }
-  C[thread_row * N + thread_col] =
-      alpha * sum + beta * C[thread_row * N + thread_col];
+  if (beta == 0.0f) {
+    C[thread_row * N + thread_col] = alpha * sum;
+  } else {
+    C[thread_row * N + thread_col] =
+        alpha * sum + beta * C[thread_row * N + thread_col];
+  }
 }
 
 void kernels::shared_mem(std::uint32_t M, std::uint32_t N, std::uint32_t K,

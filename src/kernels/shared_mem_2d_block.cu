@@ -99,13 +99,23 @@ __global__ void shared_mem_2d_block_kernel(std::uint32_t M, std::uint32_t N,
     __syncthreads();
   }
 
-  for (std::uint32_t result_idx_m = 0; result_idx_m < TM; ++result_idx_m) {
-    for (std::uint32_t result_idx_n = 0; result_idx_n < TN; ++result_idx_n) {
+  if (beta == 0.0f) {
+    for (std::uint32_t result_idx_m = 0; result_idx_m < TM; ++result_idx_m) {
+      for (std::uint32_t result_idx_n = 0; result_idx_n < TN; ++result_idx_n) {
 
-      C[(tile_row * TM + result_idx_m) * N + tile_col * TN + result_idx_n] =
-          alpha * thread_result[result_idx_m * TN + result_idx_n] +
-          beta * C[(tile_row * TM + result_idx_m) * N + tile_col * TN +
-                   result_idx_n];
+        C[(tile_row * TM + result_idx_m) * N + tile_col * TN + result_idx_n] =
+            alpha * thread_result[result_idx_m * TN + result_idx_n];
+      }
+    }
+  } else {
+    for (std::uint32_t result_idx_m = 0; result_idx_m < TM; ++result_idx_m) {
+      for (std::uint32_t result_idx_n = 0; result_idx_n < TN; ++result_idx_n) {
+
+        C[(tile_row * TM + result_idx_m) * N + tile_col * TN + result_idx_n] =
+            alpha * thread_result[result_idx_m * TN + result_idx_n] +
+            beta * C[(tile_row * TM + result_idx_m) * N + tile_col * TN +
+                     result_idx_n];
+      }
     }
   }
 }

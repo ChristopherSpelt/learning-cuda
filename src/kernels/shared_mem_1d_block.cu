@@ -70,16 +70,30 @@ __global__ void shared_mem_1d_block_kernel(std::uint32_t M, std::uint32_t N,
     __syncthreads();
   }
 
-  for (std::uint32_t res_idx = 0; res_idx < TM; ++res_idx) {
-    // Global coordinates needed for bounds checking
-    const std::uint32_t C_row_global =
-        block_row * BM + strip_row * TM + res_idx;
-    const std::uint32_t C_col_global = block_col * BN + strip_col;
+  if (beta == 0.0f) {
+    for (std::uint32_t res_idx = 0; res_idx < TM; ++res_idx) {
+      // Global coordinates needed for bounds checking
+      const std::uint32_t C_row_global =
+          block_row * BM + strip_row * TM + res_idx;
+      const std::uint32_t C_col_global = block_col * BN + strip_col;
 
-    if (C_row_global < M && C_col_global < N) {
-      C[(strip_row * TM + res_idx) * N + strip_col] =
-          alpha * thread_result[res_idx] +
-          beta * C[(strip_row * TM + res_idx) * N + strip_col];
+      if (C_row_global < M && C_col_global < N) {
+        C[(strip_row * TM + res_idx) * N + strip_col] =
+            alpha * thread_result[res_idx];
+      }
+    }
+  } else {
+    for (std::uint32_t res_idx = 0; res_idx < TM; ++res_idx) {
+      // Global coordinates needed for bounds checking
+      const std::uint32_t C_row_global =
+          block_row * BM + strip_row * TM + res_idx;
+      const std::uint32_t C_col_global = block_col * BN + strip_col;
+
+      if (C_row_global < M && C_col_global < N) {
+        C[(strip_row * TM + res_idx) * N + strip_col] =
+            alpha * thread_result[res_idx] +
+            beta * C[(strip_row * TM + res_idx) * N + strip_col];
+      }
     }
   }
 }
