@@ -86,20 +86,7 @@ __global__ void shared_mem_vec_kernel(std::uint32_t M, std::uint32_t N,
   }
 
   if (beta == 0.0f) {
-    for (std::uint32_t result_idx_m = 0; result_idx_m < TM; ++result_idx_m) {
-      for (std::uint32_t result_idx_n = 0; result_idx_n < TN;
-           result_idx_n += 4) {
 
-        float4 tmp;
-        tmp.x = alpha * thread_result[result_idx_m * TN + result_idx_n + 0];
-        tmp.y = alpha * thread_result[result_idx_m * TN + result_idx_n + 1];
-        tmp.z = alpha * thread_result[result_idx_m * TN + result_idx_n + 2];
-        tmp.w = alpha * thread_result[result_idx_m * TN + result_idx_n + 3];
-
-        reinterpret_cast<float4 *>(&C[(tile_row * TM + result_idx_m) * N +
-                                      tile_col * TN + result_idx_n])[0] = tmp;
-      }
-    }
   } else {
     for (std::uint32_t result_idx_m = 0; result_idx_m < TM; ++result_idx_m) {
       for (std::uint32_t result_idx_n = 0; result_idx_n < TN;
