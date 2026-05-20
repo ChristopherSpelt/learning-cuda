@@ -9,6 +9,8 @@
 // Output:      each thread computes a TM x TN thread-tile of C.
 // Symmetry:    strided load breaks the BM == BN constraint; per-tile slot
 //              counts only need to be divisible by NUM_THREADS.
+// Bounds:      handles non-aligned M/N/K — loads zero-fill out-of-range
+//              slots; stores skip threads past the matrix edge.
 // clang-format on
 template <int BM, int BK, int BN, int TM, int TN>
 __global__ void shared_mem_2d_block_kernel(int M, int N, int K, float alpha,
@@ -53,18 +55,29 @@ __global__ void shared_mem_2d_block_kernel(int M, int N, int K, float alpha,
   float reg_M[TM] = {0.0f};
   float reg_N[TN] = {0.0f};
 
+  // Block-invariant coord for the bounds-checked load below.
+  const int B_col_global = block_col * BN + load_Bs_col;
+
   // ---- Main loop: K-tile iteration ------------------------------------------
   for (int block_idx = 0; block_idx < K; block_idx += BK) {
+    const int A_col_global = block_idx + load_As_col;
 
-    // Load
+    // Load — out-of-range slots zero-fill; 0 is the GEMM identity.
     for (int load_offset = 0; load_offset < BM; load_offset += stride_A) {
+      const int A_row_global = block_row * BM + load_As_row + load_offset;
+
       As[(load_As_row + load_offset) * BK + load_As_col] =
-          A[(load_As_row + load_offset) * K + load_As_col];
+          (A_row_global < M && A_col_global < K)
+              ? A[(load_As_row + load_offset) * K + load_As_col]
+              : 0.0f;
     }
 
     for (int load_offset = 0; load_offset < BK; load_offset += stride_B) {
+      const int B_row_global = block_idx + load_Bs_row + load_offset;
       Bs[(load_Bs_row + load_offset) * BN + load_Bs_col] =
-          B[(load_Bs_row + load_offset) * N + load_Bs_col];
+          (B_row_global < K && B_col_global < N)
+              ? B[(load_Bs_row + load_offset) * N + load_Bs_col]
+              : 0.0f;
     }
 
     __syncthreads();
@@ -97,21 +110,31 @@ __global__ void shared_mem_2d_block_kernel(int M, int N, int K, float alpha,
   if (beta == 0.0f) {
     // β=0: pure write, no read of C
     for (int result_idx_m = 0; result_idx_m < TM; ++result_idx_m) {
-      for (int result_idx_n = 0; result_idx_n < TN; ++result_idx_n) {
+      const int C_row_global = block_row * BM + tile_row * TM + result_idx_m;
 
-        C[(tile_row * TM + result_idx_m) * N + tile_col * TN + result_idx_n] =
-            alpha * thread_result[result_idx_m * TN + result_idx_n];
+      for (int result_idx_n = 0; result_idx_n < TN; ++result_idx_n) {
+        const int C_col_global = block_col * BN + tile_col * TN + result_idx_n;
+
+        if (C_row_global < M && C_col_global < N) {
+          C[(tile_row * TM + result_idx_m) * N + tile_col * TN + result_idx_n] =
+              alpha * thread_result[result_idx_m * TN + result_idx_n];
+        }
       }
     }
   } else {
     // β≠0: linear combination αAB + βC
     for (int result_idx_m = 0; result_idx_m < TM; ++result_idx_m) {
-      for (int result_idx_n = 0; result_idx_n < TN; ++result_idx_n) {
+      const int C_row_global = block_row * BM + tile_row * TM + result_idx_m;
 
-        C[(tile_row * TM + result_idx_m) * N + tile_col * TN + result_idx_n] =
-            alpha * thread_result[result_idx_m * TN + result_idx_n] +
-            beta * C[(tile_row * TM + result_idx_m) * N + tile_col * TN +
-                     result_idx_n];
+      for (int result_idx_n = 0; result_idx_n < TN; ++result_idx_n) {
+        const int C_col_global = block_col * BN + tile_col * TN + result_idx_n;
+
+        if (C_row_global < M && C_col_global < N) {
+          const int idx =
+              (tile_row * TM + result_idx_m) * N + tile_col * TN + result_idx_n;
+          C[idx] = alpha * thread_result[result_idx_m * TN + result_idx_n] +
+                   beta * C[idx];
+        }
       }
     }
   }
