@@ -16,6 +16,7 @@ int main() {
       {"shared mem 1D block", &kernels::shared_mem_1d_block},
       {"shared mem 2D block", &kernels::shared_mem_2d_block},
       {"shared mem vectorized", &kernels::shared_mem_vec},
+      {"shared mem vectorized warptiled", &kernels::shared_mem_vec_warp},
   };
 
   for (const auto &k : registry) {

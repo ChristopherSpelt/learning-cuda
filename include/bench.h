@@ -1,7 +1,6 @@
 #pragma once
 
 #include "cuda_utils.cuh"
-#include <cstdint>
 #include <limits>
 #include <string_view>
 
@@ -65,13 +64,7 @@ template <typename Launch>
   return {best_per_iter_ms, tflops};
 }
 
-[[nodiscard]] constexpr double gemm_flops(std::uint32_t M, std::uint32_t N,
-                                          std::uint32_t K) {
+[[nodiscard]] constexpr double gemm_flops(int M, int N, int K) {
   return 2.0 * double(M) * double(N) * double(K);
-}
-
-inline void print_result(std::string_view name, Result r) {
-  std::printf("%-20.*s  %8.3f ms  %7.2f TFLOPS\n", int(name.size()),
-              name.data(), r.best_ms, r.tflops);
 }
 } // namespace bench

@@ -1,70 +1,91 @@
 #include "cuda_utils.cuh"
 #include "kernels.h"
 
-constexpr std::uint32_t WARPSIZE = 32;
+constexpr int WARPSIZE = 32;
 
-template <const std::uint32_t BM, const std::uint32_t BK,
-          const std::uint32_t BN, const std::uint32_t WM,
-          const std::uint32_t WN, const std::uint32_t WNITER,
-          const std::uint32_t TM, const std::uint32_t TN,
-          const std::uint32_t NUM_THREADS>
-__global__ void shared_mem_vec_warp_kernel(std::uint32_t M, std::uint32_t N,
-                                           std::uint32_t K, float alpha,
+// clang-format off
+// Tile shape:  block tile BM x BN partitioned into warp-tiles WM x WN, each
+//              partitioned into WMITER x WNITER subtiles of WSUBM x WSUBN
+//              (WSUBM = WM/WMITER, WSUBN = WN/WNITER). As stored transposed in
+//              shared memory.
+// Load:        strided cooperative at float4 granularity; each thread loads
+//              (BM*BK)/(NUM_THREADS*4) float4s of As and
+//              (BK*BN)/(NUM_THREADS*4) float4s of Bs per sweep.
+// Output:      each thread computes WMITER x WNITER subtiles of TM x TN;
+//              epilogue stores via float4.
+// Symmetry:    strided float4 load breaks BM == BN. WSUBM x WSUBN is sized so
+//              (WSUBM/TM) * (WSUBN/TN) == WARPSIZE (one warp per subtile).
+//              Adds float4 alignment requirements on BK, BN, and TN.
+// clang-format on
+template <int BM, int BK, int BN, int WM, int WN, int WNITER, int TM, int TN,
+          int NUM_THREADS>
+__global__ void shared_mem_vec_warp_kernel(int M, int N, int K, float alpha,
                                            const float *__restrict__ A,
                                            const float *__restrict__ B,
                                            float beta, float *__restrict__ C) {
 
-  // Block coordinates: which BMxBN tile of C this thread block computes.
-  const std::uint32_t block_row = blockIdx.y;
-  const std::uint32_t block_col = blockIdx.x;
+  // ---- Compile-time invariants ----------------------------------------------
+  constexpr int NUM_WARPS = NUM_THREADS / WARPSIZE;
+  constexpr int WMITER = (WM * WN) / (WARPSIZE * TM * TN * WNITER);
+  static_assert(WMITER > 0, "WMITER underflows: WNITER too large for WM*WN");
 
-  // Warp coordinates: where in the threadblock this warp block sits.
-  const std::uint32_t warp_idx = threadIdx.x / WARPSIZE;
-  const std::uint32_t warp_row = warp_idx / (BN / WN);
-  const std::uint32_t warp_col = warp_idx % (BN / WN);
+  constexpr int WSUBM = WM / WMITER;
+  constexpr int WSUBN = WN / WNITER;
+  constexpr int row_stride_A = (NUM_THREADS * 4) / BK;
+  constexpr int row_stride_B = (NUM_THREADS * 4) / BN;
 
-  // Given fixed WM, WN, WARPSIZE, TM, TN and WNITER we can deduce
-  // WMITER, using the facts:
-  // WSUBM = WM / WMITER
-  // WSUBN = WN / WNITER
-  // (WSUBM/TM)*(WSUBN/TN) = WARPSIZE
-  constexpr std::uint32_t WMITER = (WM * WN) / (WARPSIZE * TM * TN * WNITER);
-  constexpr std::uint32_t WSUBM = WM / WMITER;
-  constexpr std::uint32_t WSUBN = WN / WNITER;
+  static_assert(NUM_THREADS % WARPSIZE == 0,
+                "NUM_THREADS must be a whole-warp count");
+  static_assert(BM % WM == 0, "BM must be a multiple of WM");
+  static_assert(BN % WN == 0, "BN must be a multiple of WN");
+  static_assert((BM / WM) * (BN / WN) == NUM_WARPS,
+                "warps must tile the block exactly");
+  static_assert(WM % WMITER == 0, "WM must be divisible by WMITER");
+  static_assert(WN % WNITER == 0, "WN must be divisible by WNITER");
+  static_assert(WSUBM % TM == 0, "WSUBM must be a multiple of TM");
+  static_assert(WSUBN % TN == 0, "WSUBN must be a multiple of TN");
+  static_assert((WSUBM / TM) * (WSUBN / TN) == WARPSIZE,
+                "thread tile must cover exactly one warp (WARPSIZE lanes)");
+  static_assert(BK % 4 == 0, "BK must be divisible by 4 for float4 As load");
+  static_assert(BN % 4 == 0, "BN must be divisible by 4 for float4 Bs load");
+  static_assert(TN % 4 == 0,
+                "TN must be divisible by 4 for float4 epilogue stores");
+  static_assert((NUM_THREADS * 4) % BK == 0, "row_stride_A must be integer");
+  static_assert((NUM_THREADS * 4) % BN == 0, "row_stride_B must be integer");
 
-  // Which thread tile inside the current subtile.
-  const std::uint32_t thread_idx_in_warp = threadIdx.x % WARPSIZE;
-  const std::uint32_t thread_row_in_warp = thread_idx_in_warp / (WSUBN / TN);
-  const std::uint32_t thread_col_in_warp = thread_idx_in_warp % (WSUBN / TN);
-
-  // Shared tiles
+  // ---- Prologue: tile coordinates, pointer offsets, register init -----------
   __shared__ float As[BM * BK];
   __shared__ float Bs[BK * BN];
 
-  // load_As_row, load_As_col: where this thread loads into As during one sweep.
-  const std::uint32_t load_As_row = threadIdx.x / (BK / 4);
-  const std::uint32_t load_As_col = threadIdx.x % (BK / 4);
-  constexpr std::uint32_t row_stride_A = (NUM_THREADS * 4) / BK;
+  const int block_row = blockIdx.y;
+  const int block_col = blockIdx.x;
 
-  const std::uint32_t load_Bs_row = threadIdx.x / (BN / 4);
-  const std::uint32_t load_Bs_col = threadIdx.x % (BN / 4);
-  constexpr std::uint32_t row_stride_B = (NUM_THREADS * 4) / BN;
+  const int warp_idx = threadIdx.x / WARPSIZE;
+  const int warp_row = warp_idx / (BN / WN);
+  const int warp_col = warp_idx % (BN / WN);
 
-  A += block_row * BM * K; // BLOCK: jump to my row stripe of A
-  B += block_col * BN;     // BLOCK: jump to my col stripe of B
-  C += (block_row * BM + warp_row * WM) * N + block_col * BN +
-       warp_col * WN; // BLOCK: jump to my tile in C
+  const int thread_idx_in_warp = threadIdx.x % WARPSIZE;
+  const int thread_row_in_warp = thread_idx_in_warp / (WSUBN / TN);
+  const int thread_col_in_warp = thread_idx_in_warp % (WSUBN / TN);
+
+  const int load_As_row = threadIdx.x / (BK / 4);
+  const int load_As_col = threadIdx.x % (BK / 4);
+  const int load_Bs_row = threadIdx.x / (BN / 4);
+  const int load_Bs_col = threadIdx.x % (BN / 4);
+
+  A += block_row * BM * K;
+  B += block_col * BN;
+  C += (block_row * BM + warp_row * WM) * N + block_col * BN + warp_col * WN;
 
   float thread_result[WMITER * TM * WNITER * TN] = {0.0f};
 
   float reg_M[WMITER * TM] = {0.0f};
   float reg_N[WNITER * TN] = {0.0f};
 
-  for (std::uint32_t block_idx = 0; block_idx < K; block_idx += BK) {
-
-    for (std::uint32_t offset = 0; offset + row_stride_A <= BM;
-         offset += row_stride_A) {
-      // Load A transpose into shared memory
+  // ---- Main loop: K-tile iteration ------------------------------------------
+  for (int block_idx = 0; block_idx < K; block_idx += BK) {
+    // Load (As transposed)
+    for (int offset = 0; offset + row_stride_A <= BM; offset += row_stride_A) {
       const float4 tmp = reinterpret_cast<const float4 *>(
           &A[(load_As_row + offset) * K + load_As_col * 4])[0];
       As[(load_As_col * 4 + 0) * BM + load_As_row + offset] = tmp.x;
@@ -73,9 +94,7 @@ __global__ void shared_mem_vec_warp_kernel(std::uint32_t M, std::uint32_t N,
       As[(load_As_col * 4 + 3) * BM + load_As_row + offset] = tmp.w;
     }
 
-    for (std::uint32_t offset = 0; offset + row_stride_B <= BK;
-         offset += row_stride_B) {
-
+    for (int offset = 0; offset + row_stride_B <= BK; offset += row_stride_B) {
       reinterpret_cast<float4 *>(
           &Bs[(load_Bs_row + offset) * BN + load_Bs_col * 4])[0] =
           reinterpret_cast<const float4 *>(
@@ -84,41 +103,35 @@ __global__ void shared_mem_vec_warp_kernel(std::uint32_t M, std::uint32_t N,
 
     __syncthreads();
 
-    A += BK;     // BLOCK: advance by one tile to the right
-    B += BK * N; // BLOCK: advance by one tile down.
+    A += BK;
+    B += BK * N;
 
     // Compute loop
-    for (std::uint32_t k = 0; k < BK; ++k) {
+    for (int k = 0; k < BK; ++k) {
 
       // Populate registers for a warptile.
-      for (std::uint32_t w_sub_row_idx = 0; w_sub_row_idx < WMITER;
-           ++w_sub_row_idx) {
-        for (std::uint32_t i = 0; i < TM; ++i) {
+      for (int w_sub_row_idx = 0; w_sub_row_idx < WMITER; ++w_sub_row_idx) {
+        for (int i = 0; i < TM; ++i) {
           reg_M[w_sub_row_idx * TM + i] =
               As[(k * BM) + (warp_row * WM + w_sub_row_idx * WSUBM +
                              thread_row_in_warp * TM + i)];
         }
       }
 
-      for (std::uint32_t w_sub_col_idx = 0; w_sub_col_idx < WNITER;
-           ++w_sub_col_idx) {
-        for (std::uint32_t i = 0; i < TN; ++i) {
+      for (int w_sub_col_idx = 0; w_sub_col_idx < WNITER; ++w_sub_col_idx) {
+        for (int i = 0; i < TN; ++i) {
           reg_N[w_sub_col_idx * TN + i] =
               Bs[k * BN + (warp_col * WN + w_sub_col_idx * WSUBN +
                            thread_col_in_warp * TN + i)];
         }
       }
 
-      // Warptile comutation
-      for (std::uint32_t w_sub_row_idx = 0; w_sub_row_idx < WMITER;
-           ++w_sub_row_idx) {
-        for (std::uint32_t w_sub_col_idx = 0; w_sub_col_idx < WNITER;
-             ++w_sub_col_idx) {
+      // Warptile computation
+      for (int w_sub_row_idx = 0; w_sub_row_idx < WMITER; ++w_sub_row_idx) {
+        for (int w_sub_col_idx = 0; w_sub_col_idx < WNITER; ++w_sub_col_idx) {
 
-          for (std::uint32_t result_idx_m = 0; result_idx_m < TM;
-               ++result_idx_m) {
-            for (std::uint32_t result_idx_n = 0; result_idx_n < TN;
-                 ++result_idx_n) {
+          for (int result_idx_m = 0; result_idx_m < TM; ++result_idx_m) {
+            for (int result_idx_n = 0; result_idx_n < TN; ++result_idx_n) {
 
               thread_result[(w_sub_row_idx * TM + result_idx_m) *
                                 (TN * WNITER) +
@@ -133,30 +146,27 @@ __global__ void shared_mem_vec_warp_kernel(std::uint32_t M, std::uint32_t N,
     __syncthreads();
   }
 
+  // ---- Epilogue: αAB + βC store --------------------------------------------
   if (beta == 0.0f) {
+    // β=0: pure write, no read of C
     // TODO: add code here.
   } else {
-
-    for (std::uint32_t w_sub_row_idx = 0; w_sub_row_idx < WMITER;
-         ++w_sub_row_idx) {
-      for (std::uint32_t w_sub_col_idx = 0; w_sub_col_idx < WNITER;
-           ++w_sub_col_idx) {
+    // β≠0: linear combination αAB + βC
+    for (int w_sub_row_idx = 0; w_sub_row_idx < WMITER; ++w_sub_row_idx) {
+      for (int w_sub_col_idx = 0; w_sub_col_idx < WNITER; ++w_sub_col_idx) {
 
         float *C_interim =
             C + (w_sub_row_idx * WSUBM) * N + (w_sub_col_idx * WSUBN);
 
-        for (std::uint32_t result_idx_m = 0; result_idx_m < TM;
-             ++result_idx_m) {
-          for (std::uint32_t result_idx_n = 0; result_idx_n < TN;
-               result_idx_n += 4) {
+        for (int result_idx_m = 0; result_idx_m < TM; ++result_idx_m) {
+          for (int result_idx_n = 0; result_idx_n < TN; result_idx_n += 4) {
 
             float4 tmp = reinterpret_cast<float4 *>(
                 &C_interim[(thread_row_in_warp * TM + result_idx_m) * N +
                            (thread_col_in_warp * TN + result_idx_n)])[0];
 
-            const std::uint32_t i =
-                (w_sub_row_idx * TM + result_idx_m) * (WNITER * TN) +
-                w_sub_col_idx * TN + result_idx_n;
+            const int i = (w_sub_row_idx * TM + result_idx_m) * (WNITER * TN) +
+                          w_sub_col_idx * TN + result_idx_n;
 
             tmp.x = alpha * thread_result[i + 0] + beta * tmp.x;
             tmp.y = alpha * thread_result[i + 1] + beta * tmp.y;
@@ -173,16 +183,14 @@ __global__ void shared_mem_vec_warp_kernel(std::uint32_t M, std::uint32_t N,
   }
 }
 
-void kernels::shared_mem_vec_warp(std::uint32_t M, std::uint32_t N,
-                                  std::uint32_t K, float alpha, const float *A,
-                                  const float *B, float beta, float *C) {
+void kernels::shared_mem_vec_warp(const GemmArgs &a) {
   constexpr int BM = 128, BK = 8, BN = 128, TM = 8, TN = 8;
-  constexpr int THREADS = (BN * BM) / (TM * TN);
+  constexpr int NUM_THREADS = (BM * BN) / (TM * TN);
 
-  dim3 block(THREADS);
-  dim3 grid(ceil_div(N, BN), ceil_div(M, BM));
+  dim3 block(NUM_THREADS);
+  dim3 grid(ceil_div(a.N, BN), ceil_div(a.M, BM));
 
-  shared_mem_vec_warp_kernel<BM, BK, BN, TM, TN>
-      <<<grid, block>>>(M, N, K, alpha, A, B, beta, C);
+  shared_mem_vec_warp_kernel<BM, BK, BN, WM, WN, WNITER, TM, TN, NUM_THREADS>
+      <<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
   CUDA_CHECK_LAUNCH();
 }

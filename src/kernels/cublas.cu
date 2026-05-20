@@ -22,46 +22,41 @@ cublasHandle_t cublas_handle() {
   return h.get();
 }
 
-void cublas_sgemm_row_major(cublasMath_t mode, std::uint32_t M, std::uint32_t N,
-                            std::uint32_t K, float alpha, const float *A,
+void cublas_sgemm_row_major(cublasMath_t mode, int M, int N,
+                            int K, float alpha, const float *A,
                             const float *B, float beta, float *C) {
   auto h = cublas_handle();
   CUBLAS_CHECK(cublasSetMathMode(h, mode));
-  CUBLAS_CHECK(cublasSgemm(h, CUBLAS_OP_N, CUBLAS_OP_N, int(N), int(M), int(K),
-                           &alpha, B, int(N), A, int(K), &beta, C, int(N)));
+  CUBLAS_CHECK(cublasSgemm(h, CUBLAS_OP_N, CUBLAS_OP_N, N, M, K, &alpha, B, N, A,
+                           K, &beta, C, N));
 }
 
 void cublas_sgemm_ex_row_major(cublasComputeType_t compute_type,
-                               std::uint32_t M, std::uint32_t N,
-                               std::uint32_t K, float alpha, const float *A,
+                               int M, int N,
+                               int K, float alpha, const float *A,
                                const float *B, float beta, float *C) {
 
   auto h = cublas_handle();
   CUBLAS_CHECK(cublasSetMathMode(h, CUBLAS_DEFAULT_MATH));
 
-  CUBLAS_CHECK(cublasGemmEx(h, CUBLAS_OP_N, CUBLAS_OP_N, int(N), int(M), int(K),
-                            &alpha, B, CUDA_R_32F, int(N), A, CUDA_R_32F, int(K),
-                            &beta, C, CUDA_R_32F, int(N), compute_type,
-                            CUBLAS_GEMM_DEFAULT));
+  CUBLAS_CHECK(cublasGemmEx(h, CUBLAS_OP_N, CUBLAS_OP_N, N, M, K, &alpha, B,
+                            CUDA_R_32F, N, A, CUDA_R_32F, K, &beta, C,
+                            CUDA_R_32F, N, compute_type, CUBLAS_GEMM_DEFAULT));
 }
 
 } // namespace
 
-void kernels::cublas_pedantic(std::uint32_t M, std::uint32_t N, std::uint32_t K,
-                              float alpha, const float *A, const float *B,
-                              float beta, float *C) {
-  cublas_sgemm_row_major(CUBLAS_PEDANTIC_MATH, M, N, K, alpha, A, B, beta, C);
+void kernels::cublas_pedantic(const GemmArgs &a) {
+  cublas_sgemm_row_major(CUBLAS_PEDANTIC_MATH, a.M, a.N, a.K, a.alpha, a.A, a.B,
+                         a.beta, a.C);
 }
 
-void kernels::cublas_default(std::uint32_t M, std::uint32_t N, std::uint32_t K,
-                             float alpha, const float *A, const float *B,
-                             float beta, float *C) {
-  cublas_sgemm_row_major(CUBLAS_DEFAULT_MATH, M, N, K, alpha, A, B, beta, C);
+void kernels::cublas_default(const GemmArgs &a) {
+  cublas_sgemm_row_major(CUBLAS_DEFAULT_MATH, a.M, a.N, a.K, a.alpha, a.A, a.B,
+                         a.beta, a.C);
 }
 
-void kernels::cublas_tf32(std::uint32_t M, std::uint32_t N, std::uint32_t K,
-                          float alpha, const float *A, const float *B,
-                          float beta, float *C) {
-  cublas_sgemm_ex_row_major(CUBLAS_COMPUTE_32F_FAST_TF32, M, N, K, alpha, A, B,
-                            beta, C);
+void kernels::cublas_tf32(const GemmArgs &a) {
+  cublas_sgemm_ex_row_major(CUBLAS_COMPUTE_32F_FAST_TF32, a.M, a.N, a.K,
+                            a.alpha, a.A, a.B, a.beta, a.C);
 }

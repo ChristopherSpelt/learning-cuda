@@ -1,16 +1,12 @@
 #pragma once
-#include <cstdint>
+
+#include "gemm_types.h"
 
 namespace kernels {
 
-void cublas_pedantic(std::uint32_t M, std::uint32_t N, std::uint32_t K,
-                     float alpha, const float *A, const float *B, float beta,
-                     float *C);
+void cublas_pedantic(const GemmArgs &);
 
-void cublas_default(std::uint32_t M, std::uint32_t N, std::uint32_t K,
-                    float alpha, const float *A, const float *B, float beta,
-                    float *C);
+void cublas_default(const GemmArgs &);
 
-void cublas_tf32(std::uint32_t M, std::uint32_t N, std::uint32_t K, float alpha,
-                 const float *A, const float *B, float beta, float *C);
+void cublas_tf32(const GemmArgs &);
 } // namespace kernels

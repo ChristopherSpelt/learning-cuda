@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cmath>
-#include <cstdint>
 #include <limits>
 #include <random>
 #include <span>
@@ -9,8 +8,7 @@
 
 namespace numerics {
 
-inline std::vector<float> random_matrix(std::uint32_t rows, std::uint32_t cols,
-                                        std::uint32_t seed) {
+inline std::vector<float> random_matrix(int rows, int cols, int seed) {
 
   std::mt19937 gen(seed);
   std::normal_distribution<float> dist(0.0f, 1.0f);
@@ -37,6 +35,10 @@ inline float relative_rmse(std::span<const float> a, std::span<const float> b) {
 
   mse /= double(a.size());
   ref_sq_mean /= double(a.size());
+
+  if (ref_sq_mean == 0.0f) {
+    return mse == 0.0f ? 0.0f : std::numeric_limits<float>::infinity();
+  }
 
   return float(std::sqrt(mse) / std::sqrt(ref_sq_mean));
 }

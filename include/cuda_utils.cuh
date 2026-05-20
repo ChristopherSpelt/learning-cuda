@@ -1,13 +1,15 @@
 #pragma once
 
+#include <cstdlib>
 #include <cuda_runtime.h>
+#include <format>
 #include <iostream>
 
 inline void cuda_check(cudaError_t code, const char *file, int line) {
   if (code != cudaSuccess) {
-    std::cerr << "CUDA error " << cudaGetErrorName(code) << ": "
-              << cudaGetErrorString(code) << " at " << file << ": " << line
-              << std::endl;
+    std::cerr << std::format("CUDA error {}: {} at {}:{}\n",
+                            cudaGetErrorName(code), cudaGetErrorString(code),
+                            file, line);
     exit(EXIT_FAILURE);
   }
 }

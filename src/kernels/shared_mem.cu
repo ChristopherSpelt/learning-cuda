@@ -1,35 +1,45 @@
 #include "cuda_utils.cuh"
 #include "kernels.h"
 
-template <const std::uint32_t BLOCKSIZE>
-__global__ void shared_mem_kernel(std::uint32_t M, std::uint32_t N,
-                                  std::uint32_t K, float alpha,
+// clang-format off
+// Tile shape:  square block tile of BLOCKSIZE x BLOCKSIZE for As and Bs.
+// Load:        one-shot; each thread fills one float slot of As and one of Bs.
+//              NUM_THREADS = BLOCKSIZE * BLOCKSIZE.
+// Output:      each thread computes exactly one element of C.
+// Symmetry:    block tiles are square.
+// Bounds:      handles non-aligned M/N/K — loads zero-fill out-of-range
+//              slots; stores skip threads past the matrix edge.
+// clang-format on
+template <int BLOCKSIZE>
+__global__ void shared_mem_kernel(int M, int N, int K, float alpha,
                                   const float *__restrict__ A,
                                   const float *__restrict__ B, float beta,
                                   float *__restrict__ C) {
 
+  // ---- Prologue: tile coordinates, pointer offsets, register init -----------
   __shared__ float As[BLOCKSIZE * BLOCKSIZE];
   __shared__ float Bs[BLOCKSIZE * BLOCKSIZE];
 
-  auto block_row = blockIdx.y;
-  auto block_col = blockIdx.x;
+  const int block_row = blockIdx.y;
+  const int block_col = blockIdx.x;
 
-  auto thread_row = threadIdx.x / BLOCKSIZE;
-  auto thread_col = threadIdx.x % BLOCKSIZE;
+  const int thread_row = threadIdx.x / BLOCKSIZE;
+  const int thread_col = threadIdx.x % BLOCKSIZE;
 
-  auto global_row = block_row * BLOCKSIZE + thread_row;
-  auto global_col = block_col * BLOCKSIZE + thread_col;
+  const int global_row = block_row * BLOCKSIZE + thread_row;
+  const int global_col = block_col * BLOCKSIZE + thread_col;
 
-  A += block_row * BLOCKSIZE * K; // BLOCK: jump to my row stripe of A
-  B += block_col * BLOCKSIZE;     // BLOCK: jump to my col stripe of B
-  C += block_row * BLOCKSIZE * N +
-       block_col * BLOCKSIZE; // BLOCK: jump to my tile in C
+  A += block_row * BLOCKSIZE * K;
+  B += block_col * BLOCKSIZE;
+  C += block_row * BLOCKSIZE * N + block_col * BLOCKSIZE;
 
   float sum = 0.0f;
 
-  for (std::uint32_t tile = 0; tile < K; tile += BLOCKSIZE) {
-    const std::uint32_t a_col_global = tile + thread_col;
-    const std::uint32_t b_row_global = tile + thread_row;
+  // ---- Main loop: K-tile iteration ------------------------------------------
+  for (int tile = 0; tile < K; tile += BLOCKSIZE) {
+    // Load — out-of-range slots zero-fill; 0 is the GEMM identity.
+    const int a_col_global = tile + thread_col;
+    const int b_row_global = tile + thread_row;
 
     As[thread_row * BLOCKSIZE + thread_col] =
         (global_row < M && a_col_global < K) ? A[thread_row * K + thread_col]
@@ -39,30 +49,38 @@ __global__ void shared_mem_kernel(std::uint32_t M, std::uint32_t N,
                                              : 0.0f;
 
     __syncthreads();
-    A += BLOCKSIZE;     // BLOCK: advance by one tile to the right
-    B += BLOCKSIZE * N; // BLOCK: advance by one tile down.
+    A += BLOCKSIZE;
+    B += BLOCKSIZE * N;
 
-    for (std::uint32_t k = 0; k < BLOCKSIZE; ++k) {
+    // Compute loop
+    for (int k = 0; k < BLOCKSIZE; ++k) {
       sum += As[thread_row * BLOCKSIZE + k] * Bs[k * BLOCKSIZE + thread_col];
     }
     __syncthreads();
   }
+
+  // ---- Epilogue: αAB + βC store --------------------------------------------
   if (beta == 0.0f) {
-    C[thread_row * N + thread_col] = alpha * sum;
+    // β=0: pure write, no read of C
+    if (global_row < M && global_col < N) {
+      C[thread_row * N + thread_col] = alpha * sum;
+    }
   } else {
-    C[thread_row * N + thread_col] =
-        alpha * sum + beta * C[thread_row * N + thread_col];
+    // β≠0: linear combination αAB + βC
+    if (global_row < M && global_col < N) {
+      C[thread_row * N + thread_col] =
+          alpha * sum + beta * C[thread_row * N + thread_col];
+    }
   }
 }
 
-void kernels::shared_mem(std::uint32_t M, std::uint32_t N, std::uint32_t K,
-                         float alpha, const float *A, const float *B,
-                         float beta, float *C) {
+void kernels::shared_mem(const GemmArgs &a) {
   constexpr int BLOCKSIZE = 32;
 
   dim3 block(BLOCKSIZE * BLOCKSIZE);
-  dim3 grid(ceil_div(N, BLOCKSIZE), ceil_div(M, BLOCKSIZE));
+  dim3 grid(ceil_div(a.N, BLOCKSIZE), ceil_div(a.M, BLOCKSIZE));
 
-  shared_mem_kernel<BLOCKSIZE><<<grid, block>>>(M, N, K, alpha, A, B, beta, C);
+  shared_mem_kernel<BLOCKSIZE>
+      <<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
   CUDA_CHECK_LAUNCH();
 }

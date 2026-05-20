@@ -3,19 +3,20 @@
 #include "bench.h"
 #include "cuda_utils.cuh"
 #include "gemm_cublas.h"
+#include "gemm_types.h"
 #include "kernels.h"
 #include "numerics.h"
 
 #include <thrust/copy.h>
 #include <thrust/device_vector.h>
 
-#include <cstdint>
-#include <cstdio>
+#include <format>
+#include <iostream>
 #include <vector>
 
 class GemmHarness {
 public:
-  GemmHarness(std::uint32_t M, std::uint32_t N, std::uint32_t K)
+  GemmHarness(int M, int N, int K)
       : M_(M), N_(N), K_(K), A_(numerics::random_matrix(M, K, 0)),
         B_(numerics::random_matrix(K, N, 1)),
         C_init_(numerics::random_matrix(M, N, 2)), C_ref_(std::size_t(M) * N),
@@ -26,11 +27,23 @@ public:
     auto *Bd_ptr = thrust::raw_pointer_cast(Bd_.data());
     auto *Cd_ptr = thrust::raw_pointer_cast(Cd_.data());
 
-    kernels::cublas_pedantic(M_, N_, K_, kAlpha, Ad_ptr, Bd_ptr, kBeta, Cd_ptr);
+    GemmArgs ref_args{
+        .M = M_,
+        .N = N_,
+        .K = K_,
+        .alpha = kAlpha,
+        .beta = kBeta,
+        .A = Ad_ptr,
+        .B = Bd_ptr,
+        .C = Cd_ptr,
+    };
+
+    kernels::cublas_pedantic(ref_args);
     CUDA_CHECK(cudaDeviceSynchronize());
     thrust::copy(Cd_.begin(), Cd_.end(), C_ref_.begin());
 
-    std::printf("[reference: cuBLAS pedantic, %u x %u x %u]\n\n", M_, N_, K_);
+    std::cout << std::format("[reference: cuBLAS pedantic, {} x {} x {}]\n\n",
+                             M_, N_, K_);
   }
 
   GemmHarness(const GemmHarness &) = delete;
@@ -43,27 +56,39 @@ public:
 
     // Correctness: full αAB + βC against the cuBLAS reference.
     thrust::copy(C_init_.begin(), C_init_.end(), Cd_.begin());
-    kernel.launch(M_, N_, K_, kAlpha, Ad_ptr, Bd_ptr, kBeta, Cd_ptr);
+
+    GemmArgs check_args{
+        .M = M_,
+        .N = N_,
+        .K = K_,
+        .alpha = kAlpha,
+        .beta = kBeta,
+        .A = Ad_ptr,
+        .B = Bd_ptr,
+        .C = Cd_ptr,
+    };
+
+    kernel.launch(check_args);
     CUDA_CHECK(cudaDeviceSynchronize());
     thrust::copy(Cd_.begin(), Cd_.end(), C_scratch_.begin());
 
     const float rmse = numerics::relative_rmse(C_scratch_, C_ref_);
     if (rmse > kTolerance) {
-      std::printf("%-22.*s  rel RMSE %.2e  FAILED\n", int(kernel.name.size()),
-                  kernel.name.data(), rmse);
+      std::cout << std::format("{:<22}  rel RMSE {:.2e}  FAILED\n", kernel.name,
+                               rmse);
       return;
     }
 
     // Benchmark with β=0: each launch overwrites C, no contraction map.
     // FLOP count is identical.
-    auto launch = [&] {
-      kernel.launch(M_, N_, K_, kAlpha, Ad_ptr, Bd_ptr, 0.0f, Cd_ptr);
-    };
+    GemmArgs bench_args = check_args;
+    bench_args.beta = 0.0f;
+    auto launch = [&] { kernel.launch(bench_args); };
     const auto result = bench::run(launch, bench::gemm_flops(M_, N_, K_));
 
-    std::printf("%-22.*s  rel RMSE %.2e  %8.3f ms  %7.2f TFLOPS\n",
-                int(kernel.name.size()), kernel.name.data(), rmse,
-                result.best_ms, result.tflops);
+    std::cout << std::format(
+        "{:<22}  rel RMSE {:.2e}  {:8.3f} ms  {:7.2f} TFLOPS\n", kernel.name,
+        rmse, result.best_ms, result.tflops);
   }
 
 private:
@@ -71,7 +96,7 @@ private:
   static constexpr float kBeta = 0.5f;
   static constexpr float kTolerance = 1e-3f;
 
-  std::uint32_t M_, N_, K_;
+  int M_, N_, K_;
   std::vector<float> A_, B_, C_init_, C_ref_, C_scratch_;
   thrust::device_vector<float> Ad_, Bd_, Cd_;
 };

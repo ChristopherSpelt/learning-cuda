@@ -1,95 +1,89 @@
 #include "cuda_utils.cuh"
 #include "kernels.h"
 
-template <const std::uint32_t BM, const std::uint32_t BK,
-          const std::uint32_t BN, const std::uint32_t TM,
-          const std::uint32_t TN>
-__global__ void shared_mem_2d_block_kernel(std::uint32_t M, std::uint32_t N,
-                                           std::uint32_t K, float alpha,
+// clang-format off
+// Tile shape:  rectangular block tiles; As is BM x BK and Bs is BK x BN.
+// Load:        strided cooperative; each thread fills (BM*BK)/NUM_THREADS slots
+//              of As and (BK*BN)/NUM_THREADS slots of Bs per sweep, in stride_A
+//              and stride_B row windows. NUM_THREADS = (BM * BN) / (TM * TN).
+// Output:      each thread computes a TM x TN thread-tile of C.
+// Symmetry:    strided load breaks the BM == BN constraint; per-tile slot
+//              counts only need to be divisible by NUM_THREADS.
+// clang-format on
+template <int BM, int BK, int BN, int TM, int TN>
+__global__ void shared_mem_2d_block_kernel(int M, int N, int K, float alpha,
                                            const float *__restrict__ A,
                                            const float *__restrict__ B,
                                            float beta, float *__restrict__ C) {
-  // A single thread is responsible for calculating a tile of TMxTN elements in
-  // the BMxBN block of C.
-  constexpr std::uint32_t threads_per_block = (BM * BN) / (TM * TN);
 
-  // Shared tiles. Each thread loads (BM*BK)/threads_per_block slots of As and
-  // (BK*BN)/threads_per_block slots of Bs per iteration, then computes a
-  // TM x TN tile of outputs in C. The cooperative load fills stride_A complete
-  // rows of As (and stride_B complete rows of Bs) per sweep, with each thread
-  // contributing one slot per sweep.
+  // ---- Compile-time invariants ----------------------------------------------
+  constexpr int NUM_THREADS = (BM * BN) / (TM * TN);
+  constexpr int stride_A = NUM_THREADS / BK;
+  constexpr int stride_B = NUM_THREADS / BN;
+
+  static_assert(NUM_THREADS * (TM * TN) == BM * BN,
+                "BM*BN must be divisible by TM*TN");
+  static_assert(stride_A * BK == NUM_THREADS, "stride_A must be integer");
+  static_assert(BM % stride_A == 0, "As load sweep must cover BM exactly.");
+  static_assert(stride_B * BN == NUM_THREADS, "stride_B must be integer");
+  static_assert(BK % stride_B == 0, "Bs load sweep must cover BK exactly.");
+
+  // ---- Prologue: tile coordinates, pointer offsets, register init -----------
   __shared__ float As[BM * BK];
   __shared__ float Bs[BK * BN];
 
-  // Block coordinates: which BMxBN tile of C this block computes.
-  const std::uint32_t block_row = blockIdx.y;
-  const std::uint32_t block_col = blockIdx.x;
+  const int block_row = blockIdx.y;
+  const int block_col = blockIdx.x;
 
-  // Where this thread's output tile sits within the BMxBN tile in C.
-  // So tile_row ∈ [0, BM/TM) and tile_col ∈ [0, BN/TN) and a single thread
-  // writes to rows tile_row*TM, tile_row*TM + 1, ..., tile_row * TM + TM - 1
-  // and cols tile_col * TN, tile_col * TN + 1, ..., tile_col * TN + TN -1.
-  const std::uint32_t tile_row = threadIdx.x / (BN / TN);
-  const std::uint32_t tile_col = threadIdx.x % (BN / TN);
+  const int tile_row = threadIdx.x / (BN / TN);
+  const int tile_col = threadIdx.x % (BN / TN);
 
-  // load_As_row, load_As_col: where this thread loads into As during one sweep.
-  // Across sweeps, the thread strides by stride_A rows (same column).
-  // stride_A = threads_per_block / BK because As has BK columns: that's how
-  // many complete rows can be filled by one wave of threads_per_block threads.
-  const std::uint32_t load_As_row = threadIdx.x / BK;
-  const std::uint32_t load_As_col = threadIdx.x % BK;
-  constexpr std::uint32_t stride_A = threads_per_block / BK;
+  const int load_As_row = threadIdx.x / BK;
+  const int load_As_col = threadIdx.x % BK;
 
-  const std::uint32_t load_Bs_row = threadIdx.x / BN;
-  const std::uint32_t load_Bs_col = threadIdx.x % BN;
-  constexpr std::uint32_t stride_B = threads_per_block / BN;
+  const int load_Bs_row = threadIdx.x / BN;
+  const int load_Bs_col = threadIdx.x % BN;
 
-  A += block_row * BM * K;                  // BLOCK: jump to my row stripe of A
-  B += block_col * BN;                      // BLOCK: jump to my col stripe of B
-  C += block_row * BM * N + block_col * BN; // BLOCK: jump to my tile in C
+  A += block_row * BM * K;
+  B += block_col * BN;
+  C += block_row * BM * N + block_col * BN;
 
   float thread_result[TM * TN] = {0.0f};
 
   float reg_M[TM] = {0.0f};
   float reg_N[TN] = {0.0f};
 
-  // Global coordinates needed for bounds checking
-  const std::uint32_t A_row_global = block_row * BM + load_As_row;
-  const std::uint32_t B_col_global = block_col * BN + load_Bs_col;
+  // ---- Main loop: K-tile iteration ------------------------------------------
+  for (int block_idx = 0; block_idx < K; block_idx += BK) {
 
-  for (std::uint32_t block_idx = 0; block_idx < K; block_idx += BK) {
-
-    // Load into shared memory
-    for (std::uint32_t load_offset = 0; load_offset < BM;
-         load_offset += stride_A) {
+    // Load
+    for (int load_offset = 0; load_offset < BM; load_offset += stride_A) {
       As[(load_As_row + load_offset) * BK + load_As_col] =
           A[(load_As_row + load_offset) * K + load_As_col];
     }
 
-    for (std::uint32_t load_offset = 0; load_offset < BK;
-         load_offset += stride_B) {
+    for (int load_offset = 0; load_offset < BK; load_offset += stride_B) {
       Bs[(load_Bs_row + load_offset) * BN + load_Bs_col] =
           B[(load_Bs_row + load_offset) * N + load_Bs_col];
     }
 
     __syncthreads();
-    A += BK;     // BLOCK: advance by one tile to the right
-    B += BK * N; // BLOCK: advance by one tile down.
+    A += BK;
+    B += BK * N;
 
     // Compute loop
-    for (std::uint32_t k = 0; k < BK; ++k) {
+    for (int k = 0; k < BK; ++k) {
 
-      for (std::uint32_t i = 0; i < TM; ++i) {
+      for (int i = 0; i < TM; ++i) {
         reg_M[i] = As[(tile_row * TM + i) * BK + k];
       }
 
-      for (std::uint32_t i = 0; i < TN; ++i) {
+      for (int i = 0; i < TN; ++i) {
         reg_N[i] = Bs[k * BN + (tile_col * TN + i)];
       }
 
-      for (std::uint32_t result_idx_m = 0; result_idx_m < TM; ++result_idx_m) {
-        for (std::uint32_t result_idx_n = 0; result_idx_n < TN;
-             ++result_idx_n) {
+      for (int result_idx_m = 0; result_idx_m < TM; ++result_idx_m) {
+        for (int result_idx_n = 0; result_idx_n < TN; ++result_idx_n) {
 
           thread_result[result_idx_m * TN + result_idx_n] +=
               reg_M[result_idx_m] * reg_N[result_idx_n];
@@ -99,17 +93,20 @@ __global__ void shared_mem_2d_block_kernel(std::uint32_t M, std::uint32_t N,
     __syncthreads();
   }
 
+  // ---- Epilogue: αAB + βC store --------------------------------------------
   if (beta == 0.0f) {
-    for (std::uint32_t result_idx_m = 0; result_idx_m < TM; ++result_idx_m) {
-      for (std::uint32_t result_idx_n = 0; result_idx_n < TN; ++result_idx_n) {
+    // β=0: pure write, no read of C
+    for (int result_idx_m = 0; result_idx_m < TM; ++result_idx_m) {
+      for (int result_idx_n = 0; result_idx_n < TN; ++result_idx_n) {
 
         C[(tile_row * TM + result_idx_m) * N + tile_col * TN + result_idx_n] =
             alpha * thread_result[result_idx_m * TN + result_idx_n];
       }
     }
   } else {
-    for (std::uint32_t result_idx_m = 0; result_idx_m < TM; ++result_idx_m) {
-      for (std::uint32_t result_idx_n = 0; result_idx_n < TN; ++result_idx_n) {
+    // β≠0: linear combination αAB + βC
+    for (int result_idx_m = 0; result_idx_m < TM; ++result_idx_m) {
+      for (int result_idx_n = 0; result_idx_n < TN; ++result_idx_n) {
 
         C[(tile_row * TM + result_idx_m) * N + tile_col * TN + result_idx_n] =
             alpha * thread_result[result_idx_m * TN + result_idx_n] +
@@ -120,16 +117,14 @@ __global__ void shared_mem_2d_block_kernel(std::uint32_t M, std::uint32_t N,
   }
 }
 
-void kernels::shared_mem_2d_block(std::uint32_t M, std::uint32_t N,
-                                  std::uint32_t K, float alpha, const float *A,
-                                  const float *B, float beta, float *C) {
+void kernels::shared_mem_2d_block(const GemmArgs &a) {
   constexpr int BM = 64, BK = 8, BN = 64, TM = 8, TN = 8;
-  constexpr int THREADS = (BN * BM) / (TM * TN);
+  constexpr int NUM_THREADS = (BM * BN) / (TM * TN);
 
-  dim3 block(THREADS);
-  dim3 grid(ceil_div(N, BN), ceil_div(M, BM));
+  dim3 block(NUM_THREADS);
+  dim3 grid(ceil_div(a.N, BN), ceil_div(a.M, BM));
 
   shared_mem_2d_block_kernel<BM, BK, BN, TM, TN>
-      <<<grid, block>>>(M, N, K, alpha, A, B, beta, C);
+      <<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
   CUDA_CHECK_LAUNCH();
 }
