@@ -1,4 +1,5 @@
 #include "cuda_utils.cuh"
+#include "epilogue.cuh"
 #include "kernels.h"
 
 // clang-format off
@@ -12,7 +13,7 @@
 // Symmetry:    one-shot float4 load re-imposes BM == BN. Adds float4 alignment requirements on
 //              BK, BN and TN.
 // clang-format on
-template <int BM, int BK, int BN, int TM, int TN>
+template <int BM, int BK, int BN, int TM, int TN, bool BetaIsZero>
 __global__ void shared_mem_vec_kernel(int M, int N, int K, float alpha,
                                       const float *__restrict__ A,
                                       const float *__restrict__ B, float beta,
@@ -95,43 +96,19 @@ __global__ void shared_mem_vec_kernel(int M, int N, int K, float alpha,
   }
 
   // ---- Epilogue: αAB + βC store --------------------------------------------
-  if (beta == 0.0f) {
-    // β=0: pure write, no read of C
-    for (int result_idx_m = 0; result_idx_m < TM; ++result_idx_m) {
-      for (int result_idx_n = 0; result_idx_n < TN; result_idx_n += 4) {
+  for (int result_idx_m = 0; result_idx_m < TM; ++result_idx_m) {
+    for (int result_idx_n = 0; result_idx_n < TN; result_idx_n += 4) {
 
-        float4 tmp;
-        tmp.x = alpha * thread_result[result_idx_m * TN + result_idx_n + 0];
-        tmp.y = alpha * thread_result[result_idx_m * TN + result_idx_n + 1];
-        tmp.z = alpha * thread_result[result_idx_m * TN + result_idx_n + 2];
-        tmp.w = alpha * thread_result[result_idx_m * TN + result_idx_n + 3];
+      float4 product;
+      product.x = alpha * thread_result[result_idx_m * TN + result_idx_n + 0];
+      product.y = alpha * thread_result[result_idx_m * TN + result_idx_n + 1];
+      product.z = alpha * thread_result[result_idx_m * TN + result_idx_n + 2];
+      product.w = alpha * thread_result[result_idx_m * TN + result_idx_n + 3];
 
-        reinterpret_cast<float4 *>(&C[(tile_row * TM + result_idx_m) * N +
-                                      tile_col * TN + result_idx_n])[0] = tmp;
-      }
-    }
-
-  } else {
-    // β≠0: linear combination αAB + βC
-    for (int result_idx_m = 0; result_idx_m < TM; ++result_idx_m) {
-      for (int result_idx_n = 0; result_idx_n < TN; result_idx_n += 4) {
-
-        float4 tmp =
-            reinterpret_cast<float4 *>(&C[(tile_row * TM + result_idx_m) * N +
-                                          tile_col * TN + result_idx_n])[0];
-
-        tmp.x = alpha * thread_result[result_idx_m * TN + result_idx_n + 0] +
-                beta * tmp.x;
-        tmp.y = alpha * thread_result[result_idx_m * TN + result_idx_n + 1] +
-                beta * tmp.y;
-        tmp.z = alpha * thread_result[result_idx_m * TN + result_idx_n + 2] +
-                beta * tmp.z;
-        tmp.w = alpha * thread_result[result_idx_m * TN + result_idx_n + 3] +
-                beta * tmp.w;
-
-        reinterpret_cast<float4 *>(&C[(tile_row * TM + result_idx_m) * N +
-                                      tile_col * TN + result_idx_n])[0] = tmp;
-      }
+      auto *destination =
+          reinterpret_cast<float4 *>(&C[(tile_row * TM + result_idx_m) * N +
+                                        tile_col * TN + result_idx_n]);
+      store_result<BetaIsZero>(destination, product, beta);
     }
   }
 }
@@ -143,7 +120,12 @@ void kernels::shared_mem_vec(const GemmArgs &a) {
   dim3 block(NUM_THREADS);
   dim3 grid(ceil_div(a.N, BN), ceil_div(a.M, BM));
 
-  shared_mem_vec_kernel<BM, BK, BN, TM, TN>
-      <<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
+  if (a.beta == 0.0f) {
+    shared_mem_vec_kernel<BM, BK, BN, TM, TN, true>
+        <<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
+  } else {
+    shared_mem_vec_kernel<BM, BK, BN, TM, TN, false>
+        <<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
+  }
   CUDA_CHECK_LAUNCH();
 }

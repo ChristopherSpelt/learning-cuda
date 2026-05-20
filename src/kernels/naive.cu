@@ -1,4 +1,5 @@
 #include "cuda_utils.cuh"
+#include "epilogue.cuh"
 #include "kernels.h"
 
 // clang-format off
@@ -7,7 +8,7 @@
 // Output:      each thread computes exactly one element of C.
 // Symmetry:    no tile invariants; BLOCKSIZE has no restrictions.
 // clang-format on
-template <int BLOCKSIZE>
+template <int BLOCKSIZE, bool BetaIsZero>
 __global__ void
 naive_kernel(int M, int N, int K, float alpha, const float *__restrict__ A,
              const float *__restrict__ B, float beta, float *__restrict__ C) {
@@ -27,13 +28,7 @@ naive_kernel(int M, int N, int K, float alpha, const float *__restrict__ A,
   }
 
   // ---- Epilogue: αAB + βC store --------------------------------------------
-  if (beta == 0.0f) {
-    // β=0: pure write, no read of C
-    C[row * N + col] = alpha * sum;
-  } else {
-    // β≠0: linear combination αAB + βC
-    C[row * N + col] = alpha * sum + beta * C[row * N + col];
-  }
+  store_result<BetaIsZero>(&C[row * N + col], alpha * sum, beta);
 }
 
 void kernels::naive(const GemmArgs &a) {
@@ -42,7 +37,12 @@ void kernels::naive(const GemmArgs &a) {
   dim3 block(BLOCKSIZE * BLOCKSIZE);
   dim3 grid(ceil_div(a.N, BLOCKSIZE), ceil_div(a.M, BLOCKSIZE));
 
-  naive_kernel<BLOCKSIZE>
-      <<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
+  if (a.beta == 0.0f) {
+    naive_kernel<BLOCKSIZE, true>
+        <<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
+  } else {
+    naive_kernel<BLOCKSIZE, false>
+        <<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
+  }
   CUDA_CHECK_LAUNCH();
 }

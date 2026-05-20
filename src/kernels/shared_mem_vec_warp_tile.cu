@@ -1,4 +1,5 @@
 #include "cuda_utils.cuh"
+#include "epilogue.cuh"
 #include "kernels.h"
 
 constexpr int WARPSIZE = 32;
@@ -18,7 +19,7 @@ constexpr int WARPSIZE = 32;
 //              Adds float4 alignment requirements on BK, BN, and TN.
 // clang-format on
 template <int BM, int BK, int BN, int WM, int WN, int WNITER, int TM, int TN,
-          int NUM_THREADS>
+          int NUM_THREADS, bool BetaIsZero>
 __global__ void shared_mem_vec_warp_kernel(int M, int N, int K, float alpha,
                                            const float *__restrict__ A,
                                            const float *__restrict__ B,
@@ -147,36 +148,29 @@ __global__ void shared_mem_vec_warp_kernel(int M, int N, int K, float alpha,
   }
 
   // ---- Epilogue: αAB + βC store --------------------------------------------
-  if (beta == 0.0f) {
-    // β=0: pure write, no read of C
-    // TODO: add code here.
-  } else {
-    // β≠0: linear combination αAB + βC
-    for (int w_sub_row_idx = 0; w_sub_row_idx < WMITER; ++w_sub_row_idx) {
-      for (int w_sub_col_idx = 0; w_sub_col_idx < WNITER; ++w_sub_col_idx) {
+  for (int w_sub_row_idx = 0; w_sub_row_idx < WMITER; ++w_sub_row_idx) {
+    for (int w_sub_col_idx = 0; w_sub_col_idx < WNITER; ++w_sub_col_idx) {
 
-        float *C_interim =
-            C + (w_sub_row_idx * WSUBM) * N + (w_sub_col_idx * WSUBN);
+      float *C_interim =
+          C + (w_sub_row_idx * WSUBM) * N + (w_sub_col_idx * WSUBN);
 
-        for (int result_idx_m = 0; result_idx_m < TM; ++result_idx_m) {
-          for (int result_idx_n = 0; result_idx_n < TN; result_idx_n += 4) {
+      for (int result_idx_m = 0; result_idx_m < TM; ++result_idx_m) {
+        for (int result_idx_n = 0; result_idx_n < TN; result_idx_n += 4) {
 
-            float4 tmp = reinterpret_cast<float4 *>(
-                &C_interim[(thread_row_in_warp * TM + result_idx_m) * N +
-                           (thread_col_in_warp * TN + result_idx_n)])[0];
+          const int i = (w_sub_row_idx * TM + result_idx_m) * (WNITER * TN) +
+                        w_sub_col_idx * TN + result_idx_n;
 
-            const int i = (w_sub_row_idx * TM + result_idx_m) * (WNITER * TN) +
-                          w_sub_col_idx * TN + result_idx_n;
+          float4 product;
+          product.x = alpha * thread_result[i + 0];
+          product.y = alpha * thread_result[i + 1];
+          product.z = alpha * thread_result[i + 2];
+          product.w = alpha * thread_result[i + 3];
 
-            tmp.x = alpha * thread_result[i + 0] + beta * tmp.x;
-            tmp.y = alpha * thread_result[i + 1] + beta * tmp.y;
-            tmp.z = alpha * thread_result[i + 2] + beta * tmp.z;
-            tmp.w = alpha * thread_result[i + 3] + beta * tmp.w;
+          auto *destination = reinterpret_cast<float4 *>(
+              &C_interim[(thread_row_in_warp * TM + result_idx_m) * N +
+                         thread_col_in_warp * TN + result_idx_n]);
 
-            reinterpret_cast<float4 *>(
-                &C_interim[(thread_row_in_warp * TM + result_idx_m) * N +
-                           thread_col_in_warp * TN + result_idx_n])[0] = tmp;
-          }
+          store_result<BetaIsZero>(destination, product, beta);
         }
       }
     }
@@ -185,12 +179,20 @@ __global__ void shared_mem_vec_warp_kernel(int M, int N, int K, float alpha,
 
 void kernels::shared_mem_vec_warp(const GemmArgs &a) {
   constexpr int BM = 128, BK = 8, BN = 128, TM = 8, TN = 8;
+  constexpr int WM = 64, WN = 32, WNITER = 1;
   constexpr int NUM_THREADS = (BM * BN) / (TM * TN);
 
   dim3 block(NUM_THREADS);
   dim3 grid(ceil_div(a.N, BN), ceil_div(a.M, BM));
 
-  shared_mem_vec_warp_kernel<BM, BK, BN, WM, WN, WNITER, TM, TN, NUM_THREADS>
-      <<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
+  if (a.beta == 0.0f) {
+    shared_mem_vec_warp_kernel<BM, BK, BN, WM, WN, WNITER, TM, TN, NUM_THREADS,
+                               true>
+        <<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
+  } else {
+    shared_mem_vec_warp_kernel<BM, BK, BN, WM, WN, WNITER, TM, TN, NUM_THREADS,
+                               false>
+        <<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
+  }
   CUDA_CHECK_LAUNCH();
 }

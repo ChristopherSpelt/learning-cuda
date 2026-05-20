@@ -1,4 +1,5 @@
 #include "cuda_utils.cuh"
+#include "epilogue.cuh"
 #include "kernels.h"
 
 // clang-format off
@@ -10,7 +11,7 @@
 // Bounds:      handles non-aligned M/N/K — loads zero-fill out-of-range
 //              slots; stores skip threads past the matrix edge.
 // clang-format on
-template <int BLOCKSIZE>
+template <int BLOCKSIZE, bool BetaIsZero>
 __global__ void shared_mem_kernel(int M, int N, int K, float alpha,
                                   const float *__restrict__ A,
                                   const float *__restrict__ B, float beta,
@@ -60,17 +61,9 @@ __global__ void shared_mem_kernel(int M, int N, int K, float alpha,
   }
 
   // ---- Epilogue: αAB + βC store --------------------------------------------
-  if (beta == 0.0f) {
-    // β=0: pure write, no read of C
-    if (global_row < M && global_col < N) {
-      C[thread_row * N + thread_col] = alpha * sum;
-    }
-  } else {
-    // β≠0: linear combination αAB + βC
-    if (global_row < M && global_col < N) {
-      C[thread_row * N + thread_col] =
-          alpha * sum + beta * C[thread_row * N + thread_col];
-    }
+  if (global_row < M && global_col < N) {
+    store_result<BetaIsZero>(&C[thread_row * N + thread_col], alpha * sum,
+                             beta);
   }
 }
 
@@ -80,7 +73,12 @@ void kernels::shared_mem(const GemmArgs &a) {
   dim3 block(BLOCKSIZE * BLOCKSIZE);
   dim3 grid(ceil_div(a.N, BLOCKSIZE), ceil_div(a.M, BLOCKSIZE));
 
-  shared_mem_kernel<BLOCKSIZE>
-      <<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
+  if (a.beta == 0.0f) {
+    shared_mem_kernel<BLOCKSIZE, true>
+        <<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
+  } else {
+    shared_mem_kernel<BLOCKSIZE, false>
+        <<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
+  }
   CUDA_CHECK_LAUNCH();
 }

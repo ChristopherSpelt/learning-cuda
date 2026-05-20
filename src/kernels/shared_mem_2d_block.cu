@@ -1,4 +1,5 @@
 #include "cuda_utils.cuh"
+#include "epilogue.cuh"
 #include "kernels.h"
 
 // clang-format off
@@ -12,7 +13,7 @@
 // Bounds:      handles non-aligned M/N/K — loads zero-fill out-of-range
 //              slots; stores skip threads past the matrix edge.
 // clang-format on
-template <int BM, int BK, int BN, int TM, int TN>
+template <int BM, int BK, int BN, int TM, int TN, bool BetaIsZero>
 __global__ void shared_mem_2d_block_kernel(int M, int N, int K, float alpha,
                                            const float *__restrict__ A,
                                            const float *__restrict__ B,
@@ -107,34 +108,17 @@ __global__ void shared_mem_2d_block_kernel(int M, int N, int K, float alpha,
   }
 
   // ---- Epilogue: αAB + βC store --------------------------------------------
-  if (beta == 0.0f) {
-    // β=0: pure write, no read of C
-    for (int result_idx_m = 0; result_idx_m < TM; ++result_idx_m) {
-      const int C_row_global = block_row * BM + tile_row * TM + result_idx_m;
+  for (int result_idx_m = 0; result_idx_m < TM; ++result_idx_m) {
+    const int C_row_global = block_row * BM + tile_row * TM + result_idx_m;
 
-      for (int result_idx_n = 0; result_idx_n < TN; ++result_idx_n) {
-        const int C_col_global = block_col * BN + tile_col * TN + result_idx_n;
+    for (int result_idx_n = 0; result_idx_n < TN; ++result_idx_n) {
+      const int C_col_global = block_col * BN + tile_col * TN + result_idx_n;
 
-        if (C_row_global < M && C_col_global < N) {
-          C[(tile_row * TM + result_idx_m) * N + tile_col * TN + result_idx_n] =
-              alpha * thread_result[result_idx_m * TN + result_idx_n];
-        }
-      }
-    }
-  } else {
-    // β≠0: linear combination αAB + βC
-    for (int result_idx_m = 0; result_idx_m < TM; ++result_idx_m) {
-      const int C_row_global = block_row * BM + tile_row * TM + result_idx_m;
-
-      for (int result_idx_n = 0; result_idx_n < TN; ++result_idx_n) {
-        const int C_col_global = block_col * BN + tile_col * TN + result_idx_n;
-
-        if (C_row_global < M && C_col_global < N) {
-          const int idx =
-              (tile_row * TM + result_idx_m) * N + tile_col * TN + result_idx_n;
-          C[idx] = alpha * thread_result[result_idx_m * TN + result_idx_n] +
-                   beta * C[idx];
-        }
+      if (C_row_global < M && C_col_global < N) {
+        store_result<BetaIsZero>(
+            &C[(tile_row * TM + result_idx_m) * N + tile_col * TN +
+               result_idx_n],
+            alpha * thread_result[result_idx_m * TN + result_idx_n], beta);
       }
     }
   }
@@ -147,7 +131,12 @@ void kernels::shared_mem_2d_block(const GemmArgs &a) {
   dim3 block(NUM_THREADS);
   dim3 grid(ceil_div(a.N, BN), ceil_div(a.M, BM));
 
-  shared_mem_2d_block_kernel<BM, BK, BN, TM, TN>
-      <<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
+  if (a.beta == 0.0f) {
+    shared_mem_2d_block_kernel<BM, BK, BN, TM, TN, true>
+        <<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
+  } else {
+    shared_mem_2d_block_kernel<BM, BK, BN, TM, TN, false>
+        <<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
+  }
   CUDA_CHECK_LAUNCH();
 }
