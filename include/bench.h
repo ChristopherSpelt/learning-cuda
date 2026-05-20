@@ -4,7 +4,7 @@
 #include <limits>
 #include <string_view>
 
-namespace bench {
+namespace cul::bench {
 
 struct Result {
   double best_ms;
@@ -67,4 +67,4 @@ template <typename Launch>
 [[nodiscard]] constexpr double gemm_flops(int M, int N, int K) {
   return 2.0 * double(M) * double(N) * double(K);
 }
-} // namespace bench
+} // namespace cul::bench

@@ -2,6 +2,8 @@
 #include "epilogue.cuh"
 #include "kernels.h"
 
+namespace cul {
+namespace {
 // clang-format off
 // Tile shape:  rectangular block tiles; As is BM x BK and Bs is BK x BN. As is stored
 //              transposed in shared memory so that the inner-k load is coalesced.
@@ -31,9 +33,6 @@ __global__ void shared_mem_vec_kernel(int M, int N, int K, float alpha,
                 "TN must be a multiple of 4 for float4 epilogue stores");
 
   // ---- Prologue: tile coordinates, pointer offsets, register init -----------
-  __shared__ float As[BM * BK];
-  __shared__ float Bs[BK * BN];
-
   const int block_row = blockIdx.y;
   const int block_col = blockIdx.x;
 
@@ -42,6 +41,7 @@ __global__ void shared_mem_vec_kernel(int M, int N, int K, float alpha,
 
   const int load_As_row = threadIdx.x / (BK / 4);
   const int load_As_col = threadIdx.x % (BK / 4);
+
   const int load_Bs_row = threadIdx.x / (BN / 4);
   const int load_Bs_col = threadIdx.x % (BN / 4);
 
@@ -49,13 +49,16 @@ __global__ void shared_mem_vec_kernel(int M, int N, int K, float alpha,
   B += block_col * BN;
   C += block_row * BM * N + block_col * BN;
 
+  __shared__ float As[BM * BK];
+  __shared__ float Bs[BK * BN];
+
   float thread_result[TM * TN] = {0.0f};
 
   float reg_M[TM] = {0.0f};
   float reg_N[TN] = {0.0f};
 
   // ---- Main loop: K-tile iteration ------------------------------------------
-  for (int block_idx = 0; block_idx < K; block_idx += BK) {
+  for (int k_tile = 0; k_tile < K; k_tile += BK) {
 
     // Load (As transposed)
     float4 tmp = reinterpret_cast<const float4 *>(
@@ -84,11 +87,11 @@ __global__ void shared_mem_vec_kernel(int M, int N, int K, float alpha,
         reg_N[i] = Bs[k * BN + (tile_col * TN + i)];
       }
 
-      for (int result_idx_m = 0; result_idx_m < TM; ++result_idx_m) {
-        for (int result_idx_n = 0; result_idx_n < TN; ++result_idx_n) {
+      for (int res_idx_m = 0; res_idx_m < TM; ++res_idx_m) {
+        for (int res_idx_n = 0; res_idx_n < TN; ++res_idx_n) {
 
-          thread_result[result_idx_m * TN + result_idx_n] +=
-              reg_M[result_idx_m] * reg_N[result_idx_n];
+          thread_result[res_idx_m * TN + res_idx_n] +=
+              reg_M[res_idx_m] * reg_N[res_idx_n];
         }
       }
     }
@@ -96,29 +99,30 @@ __global__ void shared_mem_vec_kernel(int M, int N, int K, float alpha,
   }
 
   // ---- Epilogue: αAB + βC store --------------------------------------------
-  for (int result_idx_m = 0; result_idx_m < TM; ++result_idx_m) {
-    for (int result_idx_n = 0; result_idx_n < TN; result_idx_n += 4) {
+  for (int res_idx_m = 0; res_idx_m < TM; ++res_idx_m) {
+    for (int res_idx_n = 0; res_idx_n < TN; res_idx_n += 4) {
 
       float4 product;
-      product.x = alpha * thread_result[result_idx_m * TN + result_idx_n + 0];
-      product.y = alpha * thread_result[result_idx_m * TN + result_idx_n + 1];
-      product.z = alpha * thread_result[result_idx_m * TN + result_idx_n + 2];
-      product.w = alpha * thread_result[result_idx_m * TN + result_idx_n + 3];
+      product.x = alpha * thread_result[res_idx_m * TN + res_idx_n + 0];
+      product.y = alpha * thread_result[res_idx_m * TN + res_idx_n + 1];
+      product.z = alpha * thread_result[res_idx_m * TN + res_idx_n + 2];
+      product.w = alpha * thread_result[res_idx_m * TN + res_idx_n + 3];
 
       auto *destination =
-          reinterpret_cast<float4 *>(&C[(tile_row * TM + result_idx_m) * N +
-                                        tile_col * TN + result_idx_n]);
-      store_result<BetaIsZero>(destination, product, beta);
+          reinterpret_cast<float4 *>(&C[(tile_row * TM + res_idx_m) * N +
+                                        tile_col * TN + res_idx_n]);
+      epilogue::store_result<BetaIsZero>(destination, product, beta);
     }
   }
 }
+} // namespace
 
 void kernels::shared_mem_vec(const GemmArgs &a) {
   constexpr int BM = 128, BK = 8, BN = 128, TM = 8, TN = 8;
   constexpr int NUM_THREADS = (BM * BN) / (TM * TN);
 
   dim3 block(NUM_THREADS);
-  dim3 grid(ceil_div(a.N, BN), ceil_div(a.M, BM));
+  dim3 grid(cuda_utils::ceil_div(a.N, BN), cuda_utils::ceil_div(a.M, BM));
 
   if (a.beta == 0.0f) {
     shared_mem_vec_kernel<BM, BK, BN, TM, TN, true>
@@ -129,3 +133,5 @@ void kernels::shared_mem_vec(const GemmArgs &a) {
   }
   CUDA_CHECK_LAUNCH();
 }
+
+} // namespace cul

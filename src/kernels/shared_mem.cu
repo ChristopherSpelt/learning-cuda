@@ -2,6 +2,8 @@
 #include "epilogue.cuh"
 #include "kernels.h"
 
+namespace cul {
+namespace {
 // clang-format off
 // Tile shape:  square block tile of BLOCKSIZE x BLOCKSIZE for As and Bs.
 // Load:        one-shot; each thread fills one float slot of As and one of Bs.
@@ -18,9 +20,6 @@ __global__ void shared_mem_kernel(int M, int N, int K, float alpha,
                                   float *__restrict__ C) {
 
   // ---- Prologue: tile coordinates, pointer offsets, register init -----------
-  __shared__ float As[BLOCKSIZE * BLOCKSIZE];
-  __shared__ float Bs[BLOCKSIZE * BLOCKSIZE];
-
   const int block_row = blockIdx.y;
   const int block_col = blockIdx.x;
 
@@ -34,19 +33,22 @@ __global__ void shared_mem_kernel(int M, int N, int K, float alpha,
   B += block_col * BLOCKSIZE;
   C += block_row * BLOCKSIZE * N + block_col * BLOCKSIZE;
 
+  __shared__ float As[BLOCKSIZE * BLOCKSIZE];
+  __shared__ float Bs[BLOCKSIZE * BLOCKSIZE];
+
   float sum = 0.0f;
 
   // ---- Main loop: K-tile iteration ------------------------------------------
-  for (int tile = 0; tile < K; tile += BLOCKSIZE) {
+  for (int k_tile = 0; k_tile < K; k_tile += BLOCKSIZE) {
     // Load — out-of-range slots zero-fill; 0 is the GEMM identity.
-    const int a_col_global = tile + thread_col;
-    const int b_row_global = tile + thread_row;
+    const int A_col_global = k_tile + thread_col;
+    const int B_row_global = k_tile + thread_row;
 
     As[thread_row * BLOCKSIZE + thread_col] =
-        (global_row < M && a_col_global < K) ? A[thread_row * K + thread_col]
+        (global_row < M && A_col_global < K) ? A[thread_row * K + thread_col]
                                              : 0.0f;
     Bs[thread_row * BLOCKSIZE + thread_col] =
-        (global_col < N && b_row_global < K) ? B[thread_row * N + thread_col]
+        (global_col < N && B_row_global < K) ? B[thread_row * N + thread_col]
                                              : 0.0f;
 
     __syncthreads();
@@ -62,16 +64,17 @@ __global__ void shared_mem_kernel(int M, int N, int K, float alpha,
 
   // ---- Epilogue: αAB + βC store --------------------------------------------
   if (global_row < M && global_col < N) {
-    store_result<BetaIsZero>(&C[thread_row * N + thread_col], alpha * sum,
-                             beta);
+    epilogue::store_result<BetaIsZero>(&C[thread_row * N + thread_col],
+                                       alpha * sum, beta);
   }
 }
+} // namespace
 
 void kernels::shared_mem(const GemmArgs &a) {
   constexpr int BLOCKSIZE = 32;
 
   dim3 block(BLOCKSIZE * BLOCKSIZE);
-  dim3 grid(ceil_div(a.N, BLOCKSIZE), ceil_div(a.M, BLOCKSIZE));
+  dim3 grid(cuda_utils::ceil_div(a.N, BLOCKSIZE), cuda_utils::ceil_div(a.M, BLOCKSIZE));
 
   if (a.beta == 0.0f) {
     shared_mem_kernel<BLOCKSIZE, true>
@@ -82,3 +85,5 @@ void kernels::shared_mem(const GemmArgs &a) {
   }
   CUDA_CHECK_LAUNCH();
 }
+
+} // namespace cul

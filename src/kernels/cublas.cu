@@ -3,6 +3,7 @@
 
 #include <cublas_v2.h>
 
+namespace cul {
 namespace {
 class CublasHandle {
 public:
@@ -60,3 +61,5 @@ void kernels::cublas_tf32(const GemmArgs &a) {
   cublas_sgemm_ex_row_major(CUBLAS_COMPUTE_32F_FAST_TF32, a.M, a.N, a.K,
                             a.alpha, a.A, a.B, a.beta, a.C);
 }
+
+} // namespace cul

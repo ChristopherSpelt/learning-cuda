@@ -6,7 +6,7 @@
 #include <span>
 #include <vector>
 
-namespace numerics {
+namespace cul::numerics {
 
 inline std::vector<float> random_matrix(int rows, int cols, int seed) {
 
@@ -42,4 +42,4 @@ inline float relative_rmse(std::span<const float> a, std::span<const float> b) {
 
   return float(std::sqrt(mse) / std::sqrt(ref_sq_mean));
 }
-} // namespace numerics
+} // namespace cul::numerics

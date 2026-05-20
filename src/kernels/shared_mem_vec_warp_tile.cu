@@ -2,6 +2,9 @@
 #include "epilogue.cuh"
 #include "kernels.h"
 
+namespace cul {
+namespace {
+
 constexpr int WARPSIZE = 32;
 
 // clang-format off
@@ -55,9 +58,6 @@ __global__ void shared_mem_vec_warp_kernel(int M, int N, int K, float alpha,
   static_assert((NUM_THREADS * 4) % BN == 0, "row_stride_B must be integer");
 
   // ---- Prologue: tile coordinates, pointer offsets, register init -----------
-  __shared__ float As[BM * BK];
-  __shared__ float Bs[BK * BN];
-
   const int block_row = blockIdx.y;
   const int block_col = blockIdx.x;
 
@@ -71,6 +71,7 @@ __global__ void shared_mem_vec_warp_kernel(int M, int N, int K, float alpha,
 
   const int load_As_row = threadIdx.x / (BK / 4);
   const int load_As_col = threadIdx.x % (BK / 4);
+
   const int load_Bs_row = threadIdx.x / (BN / 4);
   const int load_Bs_col = threadIdx.x % (BN / 4);
 
@@ -78,13 +79,16 @@ __global__ void shared_mem_vec_warp_kernel(int M, int N, int K, float alpha,
   B += block_col * BN;
   C += (block_row * BM + warp_row * WM) * N + block_col * BN + warp_col * WN;
 
+  __shared__ float As[BM * BK];
+  __shared__ float Bs[BK * BN];
+
   float thread_result[WMITER * TM * WNITER * TN] = {0.0f};
 
   float reg_M[WMITER * TM] = {0.0f};
   float reg_N[WNITER * TN] = {0.0f};
 
   // ---- Main loop: K-tile iteration ------------------------------------------
-  for (int block_idx = 0; block_idx < K; block_idx += BK) {
+  for (int k_tile = 0; k_tile < K; k_tile += BK) {
     // Load (As transposed)
     for (int offset = 0; offset + row_stride_A <= BM; offset += row_stride_A) {
       const float4 tmp = reinterpret_cast<const float4 *>(
@@ -131,14 +135,14 @@ __global__ void shared_mem_vec_warp_kernel(int M, int N, int K, float alpha,
       for (int w_sub_row_idx = 0; w_sub_row_idx < WMITER; ++w_sub_row_idx) {
         for (int w_sub_col_idx = 0; w_sub_col_idx < WNITER; ++w_sub_col_idx) {
 
-          for (int result_idx_m = 0; result_idx_m < TM; ++result_idx_m) {
-            for (int result_idx_n = 0; result_idx_n < TN; ++result_idx_n) {
+          for (int res_idx_m = 0; res_idx_m < TM; ++res_idx_m) {
+            for (int res_idx_n = 0; res_idx_n < TN; ++res_idx_n) {
 
-              thread_result[(w_sub_row_idx * TM + result_idx_m) *
+              thread_result[(w_sub_row_idx * TM + res_idx_m) *
                                 (TN * WNITER) +
-                            (w_sub_col_idx * TN) + result_idx_n] +=
-                  reg_M[w_sub_row_idx * TM + result_idx_m] *
-                  reg_N[w_sub_col_idx * TN + result_idx_n];
+                            (w_sub_col_idx * TN) + res_idx_n] +=
+                  reg_M[w_sub_row_idx * TM + res_idx_m] *
+                  reg_N[w_sub_col_idx * TN + res_idx_n];
             }
           }
         }
@@ -154,28 +158,30 @@ __global__ void shared_mem_vec_warp_kernel(int M, int N, int K, float alpha,
       float *C_interim =
           C + (w_sub_row_idx * WSUBM) * N + (w_sub_col_idx * WSUBN);
 
-      for (int result_idx_m = 0; result_idx_m < TM; ++result_idx_m) {
-        for (int result_idx_n = 0; result_idx_n < TN; result_idx_n += 4) {
+      for (int res_idx_m = 0; res_idx_m < TM; ++res_idx_m) {
+        for (int res_idx_n = 0; res_idx_n < TN; res_idx_n += 4) {
 
-          const int i = (w_sub_row_idx * TM + result_idx_m) * (WNITER * TN) +
-                        w_sub_col_idx * TN + result_idx_n;
+          const int flat_idx =
+              (w_sub_row_idx * TM + res_idx_m) * (WNITER * TN) +
+              w_sub_col_idx * TN + res_idx_n;
 
           float4 product;
-          product.x = alpha * thread_result[i + 0];
-          product.y = alpha * thread_result[i + 1];
-          product.z = alpha * thread_result[i + 2];
-          product.w = alpha * thread_result[i + 3];
+          product.x = alpha * thread_result[flat_idx + 0];
+          product.y = alpha * thread_result[flat_idx + 1];
+          product.z = alpha * thread_result[flat_idx + 2];
+          product.w = alpha * thread_result[flat_idx + 3];
 
           auto *destination = reinterpret_cast<float4 *>(
-              &C_interim[(thread_row_in_warp * TM + result_idx_m) * N +
-                         thread_col_in_warp * TN + result_idx_n]);
+              &C_interim[(thread_row_in_warp * TM + res_idx_m) * N +
+                         thread_col_in_warp * TN + res_idx_n]);
 
-          store_result<BetaIsZero>(destination, product, beta);
+          epilogue::store_result<BetaIsZero>(destination, product, beta);
         }
       }
     }
   }
 }
+} // namespace
 
 void kernels::shared_mem_vec_warp(const GemmArgs &a) {
   constexpr int BM = 128, BK = 8, BN = 128, TM = 8, TN = 8;
@@ -183,7 +189,7 @@ void kernels::shared_mem_vec_warp(const GemmArgs &a) {
   constexpr int NUM_THREADS = (BM * BN) / (TM * TN);
 
   dim3 block(NUM_THREADS);
-  dim3 grid(ceil_div(a.N, BN), ceil_div(a.M, BM));
+  dim3 grid(cuda_utils::ceil_div(a.N, BN), cuda_utils::ceil_div(a.M, BM));
 
   if (a.beta == 0.0f) {
     shared_mem_vec_warp_kernel<BM, BK, BN, WM, WN, WNITER, TM, TN, NUM_THREADS,
@@ -196,3 +202,5 @@ void kernels::shared_mem_vec_warp(const GemmArgs &a) {
   }
   CUDA_CHECK_LAUNCH();
 }
+
+} // namespace cul

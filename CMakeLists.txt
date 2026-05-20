@@ -1,26 +1,29 @@
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.25)
 
-set(TARGET cuda_learning)
+project(cuda_learning LANGUAGES CXX CUDA)
 
+# Default to Release
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
+endif()
+
+# Default to sm_86 (RTX 3090). Override with -DCMAKE_CUDA_ARCHITECTURES=...
 if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
     set(CMAKE_CUDA_ARCHITECTURES 86)
 endif()
 
-project(${TARGET} C CXX CUDA)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+    set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+    set(CMAKE_CUDA_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+endif()
 
 find_package(CUDAToolkit REQUIRED)
 
-set(CMAKE_C_STANDARD 99)
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CUDA_STANDARD 20)
-set(CMAKE_CUDA_STANDARD_REQUIRED ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-set(SOURCES
+add_executable(${PROJECT_NAME}
     src/main.cu
-)
-
-set(KERNELS
     src/kernels/cublas.cu
     src/kernels/naive.cu
     src/kernels/shared_mem.cu
@@ -30,22 +33,19 @@ set(KERNELS
     src/kernels/shared_mem_vec_warp_tile.cu
 )
 
-add_executable(${TARGET})
+target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20 cuda_std_20)
 
-target_sources(${TARGET} PRIVATE 
-    ${SOURCES}
-    ${KERNELS}
-)
+target_include_directories(${PROJECT_NAME} PRIVATE include)
 
-target_include_directories(${TARGET} PRIVATE include)
+target_link_libraries(${PROJECT_NAME} PRIVATE CUDA::cublas)
 
-target_link_libraries(${TARGET} PRIVATE CUDA::cublas)
-
-set_target_properties(${TARGET} PROPERTIES
-    CUDA_SEPARABLE_COMPILATION ON
-)
-
-target_compile_options(${TARGET}
-    PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Werror>
-    PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-Wall,-Wextra -lineinfo>
+target_compile_options(${PROJECT_NAME} PRIVATE 
+    $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Werror>
+    $<$<COMPILE_LANGUAGE:CUDA>:
+    -Xcompiler=-Wall,-Wextra,-Werror
+    -Werror=cross-execution-space-call
+    --expt-relaxed-constexpr
+    -Xptxas=-warn-spills
+    -lineinfo
+    >
 )

@@ -2,6 +2,8 @@
 
 #include <string_view>
 
+namespace cul {
+
 struct GemmArgs {
   int M, N, K;
   float alpha, beta;
@@ -16,3 +18,5 @@ struct GemmKernel {
   std::string_view name;
   GemmLaunch launch;
 };
+
+} // namespace cul

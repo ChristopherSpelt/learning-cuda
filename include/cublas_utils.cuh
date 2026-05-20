@@ -5,7 +5,8 @@
 #include <format>
 #include <iostream>
 
-inline void cublas_check(cublasStatus_t status, const char *file, int line) {
+namespace cul::cublas_utils {
+inline void check(cublasStatus_t status, const char *file, int line) {
   if (status != CUBLAS_STATUS_SUCCESS) {
     std::cerr << std::format("cuBLAS error {}: {} at {}:{}\n",
                              cublasGetStatusName(status),
@@ -13,8 +14,9 @@ inline void cublas_check(cublasStatus_t status, const char *file, int line) {
     exit(EXIT_FAILURE);
   }
 }
+} // namespace cul::cublas_utils
 
 #define CUBLAS_CHECK(x)                                                        \
   do {                                                                         \
-    cublas_check((x), __FILE__, __LINE__);                                     \
+    ::cul::cublas_utils::check((x), __FILE__, __LINE__);                            \
   } while (0)

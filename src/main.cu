@@ -4,6 +4,8 @@
 
 #include <cstdlib>
 
+using namespace cul;
+
 int main() {
   GemmHarness harness(4096, 4096, 4096);
 

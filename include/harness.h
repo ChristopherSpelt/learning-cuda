@@ -14,6 +14,8 @@
 #include <iostream>
 #include <vector>
 
+namespace cul {
+
 class GemmHarness {
 public:
   GemmHarness(int M, int N, int K)
@@ -100,3 +102,5 @@ private:
   std::vector<float> A_, B_, C_init_, C_ref_, C_scratch_;
   thrust::device_vector<float> Ad_, Bd_, Cd_;
 };
+
+} // namespace cul

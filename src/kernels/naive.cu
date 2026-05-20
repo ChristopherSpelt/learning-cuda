@@ -2,6 +2,8 @@
 #include "epilogue.cuh"
 #include "kernels.h"
 
+namespace cul {
+namespace {
 // clang-format off
 // Tile shape:  none (no shared memory).
 // Load:        direct global reads inside the inner-k loop; no cooperative load.
@@ -28,14 +30,15 @@ naive_kernel(int M, int N, int K, float alpha, const float *__restrict__ A,
   }
 
   // ---- Epilogue: αAB + βC store --------------------------------------------
-  store_result<BetaIsZero>(&C[row * N + col], alpha * sum, beta);
+  epilogue::store_result<BetaIsZero>(&C[row * N + col], alpha * sum, beta);
 }
+} // namespace
 
 void kernels::naive(const GemmArgs &a) {
   constexpr int BLOCKSIZE = 32;
 
   dim3 block(BLOCKSIZE * BLOCKSIZE);
-  dim3 grid(ceil_div(a.N, BLOCKSIZE), ceil_div(a.M, BLOCKSIZE));
+  dim3 grid(cuda_utils::ceil_div(a.N, BLOCKSIZE), cuda_utils::ceil_div(a.M, BLOCKSIZE));
 
   if (a.beta == 0.0f) {
     naive_kernel<BLOCKSIZE, true>
@@ -46,3 +49,5 @@ void kernels::naive(const GemmArgs &a) {
   }
   CUDA_CHECK_LAUNCH();
 }
+
+} // namespace cul

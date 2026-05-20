@@ -2,6 +2,8 @@
 #include "epilogue.cuh"
 #include "kernels.h"
 
+namespace cul {
+namespace {
 // clang-format off
 // Tile shape:  rectangular block tiles; As is BM x BK and Bs is BK x BN.
 // Load:        strided cooperative; each thread fills (BM*BK)/NUM_THREADS slots
@@ -32,9 +34,6 @@ __global__ void shared_mem_2d_block_kernel(int M, int N, int K, float alpha,
   static_assert(BK % stride_B == 0, "Bs load sweep must cover BK exactly.");
 
   // ---- Prologue: tile coordinates, pointer offsets, register init -----------
-  __shared__ float As[BM * BK];
-  __shared__ float Bs[BK * BN];
-
   const int block_row = blockIdx.y;
   const int block_col = blockIdx.x;
 
@@ -51,6 +50,9 @@ __global__ void shared_mem_2d_block_kernel(int M, int N, int K, float alpha,
   B += block_col * BN;
   C += block_row * BM * N + block_col * BN;
 
+  __shared__ float As[BM * BK];
+  __shared__ float Bs[BK * BN];
+
   float thread_result[TM * TN] = {0.0f};
 
   float reg_M[TM] = {0.0f};
@@ -60,8 +62,8 @@ __global__ void shared_mem_2d_block_kernel(int M, int N, int K, float alpha,
   const int B_col_global = block_col * BN + load_Bs_col;
 
   // ---- Main loop: K-tile iteration ------------------------------------------
-  for (int block_idx = 0; block_idx < K; block_idx += BK) {
-    const int A_col_global = block_idx + load_As_col;
+  for (int k_tile = 0; k_tile < K; k_tile += BK) {
+    const int A_col_global = k_tile + load_As_col;
 
     // Load — out-of-range slots zero-fill; 0 is the GEMM identity.
     for (int load_offset = 0; load_offset < BM; load_offset += stride_A) {
@@ -74,7 +76,7 @@ __global__ void shared_mem_2d_block_kernel(int M, int N, int K, float alpha,
     }
 
     for (int load_offset = 0; load_offset < BK; load_offset += stride_B) {
-      const int B_row_global = block_idx + load_Bs_row + load_offset;
+      const int B_row_global = k_tile + load_Bs_row + load_offset;
       Bs[(load_Bs_row + load_offset) * BN + load_Bs_col] =
           (B_row_global < K && B_col_global < N)
               ? B[(load_Bs_row + load_offset) * N + load_Bs_col]
@@ -96,11 +98,11 @@ __global__ void shared_mem_2d_block_kernel(int M, int N, int K, float alpha,
         reg_N[i] = Bs[k * BN + (tile_col * TN + i)];
       }
 
-      for (int result_idx_m = 0; result_idx_m < TM; ++result_idx_m) {
-        for (int result_idx_n = 0; result_idx_n < TN; ++result_idx_n) {
+      for (int res_idx_m = 0; res_idx_m < TM; ++res_idx_m) {
+        for (int res_idx_n = 0; res_idx_n < TN; ++res_idx_n) {
 
-          thread_result[result_idx_m * TN + result_idx_n] +=
-              reg_M[result_idx_m] * reg_N[result_idx_n];
+          thread_result[res_idx_m * TN + res_idx_n] +=
+              reg_M[res_idx_m] * reg_N[res_idx_n];
         }
       }
     }
@@ -108,28 +110,29 @@ __global__ void shared_mem_2d_block_kernel(int M, int N, int K, float alpha,
   }
 
   // ---- Epilogue: αAB + βC store --------------------------------------------
-  for (int result_idx_m = 0; result_idx_m < TM; ++result_idx_m) {
-    const int C_row_global = block_row * BM + tile_row * TM + result_idx_m;
+  for (int res_idx_m = 0; res_idx_m < TM; ++res_idx_m) {
+    const int C_row_global = block_row * BM + tile_row * TM + res_idx_m;
 
-    for (int result_idx_n = 0; result_idx_n < TN; ++result_idx_n) {
-      const int C_col_global = block_col * BN + tile_col * TN + result_idx_n;
+    for (int res_idx_n = 0; res_idx_n < TN; ++res_idx_n) {
+      const int C_col_global = block_col * BN + tile_col * TN + res_idx_n;
 
       if (C_row_global < M && C_col_global < N) {
-        store_result<BetaIsZero>(
-            &C[(tile_row * TM + result_idx_m) * N + tile_col * TN +
-               result_idx_n],
-            alpha * thread_result[result_idx_m * TN + result_idx_n], beta);
+        epilogue::store_result<BetaIsZero>(
+            &C[(tile_row * TM + res_idx_m) * N + tile_col * TN +
+               res_idx_n],
+            alpha * thread_result[res_idx_m * TN + res_idx_n], beta);
       }
     }
   }
 }
+} // namespace
 
 void kernels::shared_mem_2d_block(const GemmArgs &a) {
   constexpr int BM = 64, BK = 8, BN = 64, TM = 8, TN = 8;
   constexpr int NUM_THREADS = (BM * BN) / (TM * TN);
 
   dim3 block(NUM_THREADS);
-  dim3 grid(ceil_div(a.N, BN), ceil_div(a.M, BM));
+  dim3 grid(cuda_utils::ceil_div(a.N, BN), cuda_utils::ceil_div(a.M, BM));
 
   if (a.beta == 0.0f) {
     shared_mem_2d_block_kernel<BM, BK, BN, TM, TN, true>
@@ -140,3 +143,5 @@ void kernels::shared_mem_2d_block(const GemmArgs &a) {
   }
   CUDA_CHECK_LAUNCH();
 }
+
+} // namespace cul

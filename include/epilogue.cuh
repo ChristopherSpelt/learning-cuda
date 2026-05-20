@@ -2,9 +2,11 @@
 
 #include <cuda_runtime.h>
 
+namespace cul::epilogue {
+
 template <bool BetaIsZero>
-__device__ __forceinline__ void
-store_result(float *destination, float product, [[maybe_unused]] float beta) {
+__device__ __forceinline__ void store_result(float *destination, float product,
+                                             [[maybe_unused]] float beta) {
   if constexpr (BetaIsZero) {
     *destination = product;
   } else {
@@ -14,8 +16,7 @@ store_result(float *destination, float product, [[maybe_unused]] float beta) {
 
 template <bool BetaIsZero>
 __device__ __forceinline__ void
-store_result(float4 *destination, float4 product,
-             [[maybe_unused]] float beta) {
+store_result(float4 *destination, float4 product, [[maybe_unused]] float beta) {
   if constexpr (BetaIsZero) {
     *destination = product;
   } else {
@@ -27,3 +28,4 @@ store_result(float4 *destination, float4 product,
     *destination = c;
   }
 }
+} // namespace cul::epilogue

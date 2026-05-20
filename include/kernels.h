@@ -4,7 +4,7 @@
 
 #include <string_view>
 
-namespace kernels {
+namespace cul::kernels {
 
 void naive(const GemmArgs &);
 
@@ -18,4 +18,4 @@ void shared_mem_vec(const GemmArgs &);
 
 void shared_mem_vec_warp(const GemmArgs &);
 
-} // namespace kernels
+} // namespace cul::kernels
