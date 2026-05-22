@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(cuda_learning LANGUAGES CXX CUDA)
+project(learning_cuda LANGUAGES CXX CUDA)
 
 # Default to Release
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
