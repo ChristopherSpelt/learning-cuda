@@ -118,8 +118,7 @@ __global__ void shared_mem_2d_block_kernel(int M, int N, int K, float alpha,
 
       if (C_row_global < M && C_col_global < N) {
         epilogue::store_result<BetaIsZero>(
-            &C[(tile_row * TM + res_idx_m) * N + tile_col * TN +
-               res_idx_n],
+            &C[(tile_row * TM + res_idx_m) * N + tile_col * TN + res_idx_n],
             alpha * thread_result[res_idx_m * TN + res_idx_n], beta);
       }
     }
