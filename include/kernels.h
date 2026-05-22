@@ -2,8 +2,6 @@
 
 #include "gemm_types.h"
 
-#include <string_view>
-
 namespace cul::kernels {
 
 void naive(const GemmArgs &);

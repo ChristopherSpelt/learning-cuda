@@ -21,17 +21,16 @@ constexpr int WARPSIZE = 32;
 //              (WSUBM/TM) * (WSUBN/TN) == WARPSIZE (one warp per subtile).
 //              Adds float4 alignment requirements on BK, BN, and TN.
 // clang-format on
-template <int BM, int BK, int BN, int WM, int WN, int WNITER, int TM, int TN,
-          int NUM_THREADS, bool BetaIsZero>
+template <int BM, int BK, int BN, int WM, int WN, int WMITER, int WNITER,
+          int TM, int TN, bool BetaIsZero>
 __global__ void shared_mem_vec_warp_kernel(int M, int N, int K, float alpha,
                                            const float *__restrict__ A,
                                            const float *__restrict__ B,
                                            float beta, float *__restrict__ C) {
 
   // ---- Compile-time invariants ----------------------------------------------
+  constexpr int NUM_THREADS = (BM * BN) / (TM * TN);
   constexpr int NUM_WARPS = NUM_THREADS / WARPSIZE;
-  constexpr int WMITER = (WM * WN) / (WARPSIZE * TM * TN * WNITER);
-  static_assert(WMITER > 0, "WMITER underflows: WNITER too large for WM*WN");
 
   constexpr int WSUBM = WM / WMITER;
   constexpr int WSUBN = WN / WNITER;
@@ -185,18 +184,17 @@ __global__ void shared_mem_vec_warp_kernel(int M, int N, int K, float alpha,
 
 void kernels::shared_mem_vec_warp(const GemmArgs &a) {
   constexpr int BM = 128, BK = 8, BN = 128, TM = 8, TN = 8;
-  constexpr int WM = 64, WN = 32, WNITER = 1;
+  constexpr int WM = 64, WN = 32, WMITER = 1, WNITER = 1;
   constexpr int NUM_THREADS = (BM * BN) / (TM * TN);
 
   dim3 block(NUM_THREADS);
   dim3 grid(cuda_utils::ceil_div(a.N, BN), cuda_utils::ceil_div(a.M, BM));
 
   if (a.beta == 0.0f) {
-    shared_mem_vec_warp_kernel<BM, BK, BN, WM, WN, WNITER, TM, TN, NUM_THREADS,
-                               true>
+    shared_mem_vec_warp_kernel<BM, BK, BN, WM, WN, WMITER, WNITER, TM, TN, true>
         <<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
   } else {
-    shared_mem_vec_warp_kernel<BM, BK, BN, WM, WN, WNITER, TM, TN, NUM_THREADS,
+    shared_mem_vec_warp_kernel<BM, BK, BN, WM, WN, WMITER, WNITER, TM, TN,
                                false>
         <<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
   }

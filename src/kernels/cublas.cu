@@ -12,7 +12,7 @@ public:
   CublasHandle(const CublasHandle &) = delete;
   CublasHandle &operator=(const CublasHandle &) = delete;
 
-  cublasHandle_t get() const { return handle_; }
+  [[nodiscard]] cublasHandle_t get() const { return handle_; }
 
 private:
   cublasHandle_t handle_{};

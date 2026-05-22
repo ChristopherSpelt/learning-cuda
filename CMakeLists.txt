@@ -30,7 +30,7 @@ add_executable(${PROJECT_NAME}
     src/kernels/shared_mem_1d_block.cu
     src/kernels/shared_mem_2d_block.cu
     src/kernels/shared_mem_vec.cu
-    src/kernels/shared_mem_vec_warp_tile.cu
+    src/kernels/shared_mem_vec_warp.cu
 )
 
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20 cuda_std_20)
