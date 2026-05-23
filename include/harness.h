@@ -10,7 +10,7 @@
 #include <thrust/copy.h>
 #include <thrust/device_vector.h>
 
-#include <format>
+#include <iomanip>
 #include <iostream>
 #include <vector>
 
@@ -44,8 +44,8 @@ public:
     CUDA_CHECK(cudaDeviceSynchronize());
     thrust::copy(Cd_.begin(), Cd_.end(), C_ref_.begin());
 
-    std::cout << std::format("[reference: cuBLAS pedantic, {} x {} x {}]\n\n",
-                             M_, N_, K_);
+    std::cout << "[reference: cuBLAS pedantic, " << M_ << " x " << N_ << " x "
+              << K_ << "]\n\n";
   }
 
   GemmHarness(const GemmHarness &) = delete;
@@ -76,8 +76,9 @@ public:
 
     const float rmse = numerics::relative_rmse(C_scratch_, C_ref_);
     if (rmse > kTolerance) {
-      std::cout << std::format("{:<22}  rel RMSE {:.2e}  FAILED\n", kernel.name,
-                               rmse);
+      std::cout << std::left << std::setw(22) << kernel.name << std::right
+                << "  rel RMSE " << std::scientific << std::setprecision(2)
+                << rmse << "  FAILED\n";
       return;
     }
 
@@ -88,9 +89,12 @@ public:
     auto launch = [&] { kernel.launch(bench_args); };
     const auto result = bench::run(launch, bench::gemm_flops(M_, N_, K_));
 
-    std::cout << std::format(
-        "{:<22}  rel RMSE {:.2e}  {:8.3f} ms  {:7.2f} TFLOPS\n", kernel.name,
-        rmse, result.best_ms, result.tflops);
+    std::cout << std::left << std::setw(22) << kernel.name << std::right
+              << "  rel RMSE " << std::scientific << std::setprecision(2)
+              << rmse << "  " << std::fixed << std::setprecision(3)
+              << std::setw(8) << result.best_ms << " ms  "
+              << std::setprecision(2) << std::setw(7) << result.tflops
+              << " TFLOPS\n";
   }
 
 private:

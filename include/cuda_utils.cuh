@@ -2,7 +2,6 @@
 
 #include <cstdlib>
 #include <cuda_runtime.h>
-#include <format>
 #include <iostream>
 #include <type_traits>
 
@@ -10,9 +9,9 @@ namespace cul::cuda_utils {
 
 inline void check(cudaError_t code, const char *file, int line) {
   if (code != cudaSuccess) {
-    std::cerr << std::format("CUDA error {}: {} at {}:{}\n",
-                             cudaGetErrorName(code), cudaGetErrorString(code),
-                             file, line);
+    std::cerr << "CUDA error " << cudaGetErrorName(code) << ": "
+              << cudaGetErrorString(code) << " at " << file << ":" << line
+              << "\n";
     exit(EXIT_FAILURE);
   }
 }
