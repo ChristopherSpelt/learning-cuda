@@ -1,6 +1,6 @@
 #include "cuda_utils.cuh"
 #include "epilogue.cuh"
-#include "kernels.h"
+#include "kernels/gemm.h"
 #include "loads.cuh"
 
 #include <cassert>
@@ -138,7 +138,7 @@ __global__ void shared_mem_vec_kernel(int M, int N, int K, float alpha, const fl
 }
 } // namespace
 
-void kernels::shared_mem_vec(const GemmArgs &a) {
+void kernels::gemm::shared_mem_vec(const GemmArgs &a) {
   assert((a.K % 4 == 0) && "shared_mem_vec requires K % 4 == 0 for float4 alignment");
   assert((a.N % 4 == 0) && "shared_mem_vec requires N % 4 == 0 for float4 alignment");
 

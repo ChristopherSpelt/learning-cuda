@@ -22,24 +22,10 @@ endif()
 
 find_package(CUDAToolkit REQUIRED)
 
-add_executable(${PROJECT_NAME}
-    src/main.cu
-    src/kernels/cublas.cu
-    src/kernels/naive.cu
-    src/kernels/shared_mem.cu
-    src/kernels/shared_mem_1d_block.cu
-    src/kernels/shared_mem_2d_block.cu
-    src/kernels/shared_mem_vec.cu
-    src/kernels/shared_mem_vec_warp.cu
-)
-
-target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20 cuda_std_20)
-
-target_include_directories(${PROJECT_NAME} PRIVATE include)
-
-target_link_libraries(${PROJECT_NAME} PRIVATE CUDA::cublas)
-
-target_compile_options(${PROJECT_NAME} PRIVATE 
+add_library(cul_base INTERFACE)
+target_compile_features(cul_base INTERFACE cxx_std_20 cuda_std_20)
+target_include_directories(cul_base INTERFACE include)
+target_compile_options(cul_base INTERFACE
     $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Werror>
     $<$<COMPILE_LANGUAGE:CUDA>:
     -Xcompiler=-Wall,-Wextra,-Werror
@@ -49,3 +35,26 @@ target_compile_options(${PROJECT_NAME} PRIVATE
     -lineinfo
     >
 )
+
+add_library(cul_cublas INTERFACE)
+target_link_libraries(cul_cublas INTERFACE CUDA::cublas)
+
+add_executable(gemm
+    src/gemm.cu
+    src/kernels/gemm/cublas.cu
+    src/kernels/gemm/naive.cu
+    src/kernels/gemm/shared_mem.cu
+    src/kernels/gemm/shared_mem_1d_block.cu
+    src/kernels/gemm/shared_mem_2d_block.cu
+    src/kernels/gemm/shared_mem_vec.cu
+    src/kernels/gemm/shared_mem_vec_warp.cu
+)
+target_link_libraries(gemm PRIVATE cul_base cul_cublas)
+
+add_executable(saxpy
+    src/saxpy.cu
+    src/kernels/saxpy/cublas.cu
+    src/kernels/saxpy/naive.cu
+    src/kernels/saxpy/vec_loads.cu
+)
+target_link_libraries(saxpy PRIVATE cul_base cul_cublas)

@@ -2,7 +2,7 @@
 
 #include "gemm_types.h"
 
-namespace cul::kernels {
+namespace cul::kernels::gemm {
 
 void naive(const GemmArgs &);
 
@@ -16,4 +16,4 @@ void shared_mem_vec(const GemmArgs &);
 
 void shared_mem_vec_warp(const GemmArgs &);
 
-} // namespace cul::kernels
+} // namespace cul::kernels::gemm

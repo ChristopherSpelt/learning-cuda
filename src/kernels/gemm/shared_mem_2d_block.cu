@@ -1,6 +1,6 @@
 #include "cuda_utils.cuh"
 #include "epilogue.cuh"
-#include "kernels.h"
+#include "kernels/gemm.h"
 
 namespace cul {
 namespace {
@@ -126,7 +126,7 @@ __global__ void shared_mem_2d_block_kernel(int M, int N, int K, float alpha,
 }
 } // namespace
 
-void kernels::shared_mem_2d_block(const GemmArgs &a) {
+void kernels::gemm::shared_mem_2d_block(const GemmArgs &a) {
   constexpr int BM = 64, BK = 8, BN = 64, TM = 8, TN = 8;
   constexpr int NUM_THREADS = (BM * BN) / (TM * TN);
 

@@ -6,10 +6,29 @@
 
 namespace cul::bench {
 
+// `work` MUST be in raw base units (FLOPs, bytes, elements — never
+// pre-scaled). The SI prefix lives only in `scale` (1e12 = tera, 1e9 = giga).
+// rate = work / time_in_seconds / scale.
+struct Metric {
+  double work;
+  double scale;
+  std::string_view units;
+};
+
+[[nodiscard]] constexpr Metric tflops(double flops) { return {flops, 1e12, "TFLOP/s"}; }
+[[nodiscard]] constexpr Metric gbs(double bytes) { return {bytes, 1e9, "GB/s"}; }
+
 struct Result {
   double best_ms;
-  double tflops;
+  double rate;
+  std::string_view units;
 };
+
+[[nodiscard]] constexpr double gemm_flops(int M, int N, int K) {
+  return 2.0 * double(M) * double(N) * double(K);
+}
+
+[[nodiscard]] constexpr double saxpy_bytes(int n) { return 12.0 * double(n); }
 
 class CudaTimer {
 public:
@@ -39,8 +58,8 @@ private:
 };
 
 template <typename Launch>
-[[nodiscard]] Result run(Launch &&launch, double flop_count,
-                         double target_ms = 1000.0, int inner_iters = 4) {
+[[nodiscard]] Result run(Launch &&launch, Metric metric, double target_ms = 1000.0,
+                         int inner_iters = 4) {
 
   launch();
   CUDA_CHECK(cudaDeviceSynchronize());
@@ -60,11 +79,8 @@ template <typename Launch>
     best_per_iter_ms = std::min(best_per_iter_ms, window_ms / inner_iters);
   }
 
-  const double tflops = flop_count / (best_per_iter_ms * 1e-3) / 1e12;
-  return {best_per_iter_ms, tflops};
+  const double rate = metric.work / (best_per_iter_ms * 1e-3) / metric.scale;
+  return {best_per_iter_ms, rate, metric.units};
 }
 
-[[nodiscard]] constexpr double gemm_flops(int M, int N, int K) {
-  return 2.0 * double(M) * double(N) * double(K);
-}
 } // namespace cul::bench

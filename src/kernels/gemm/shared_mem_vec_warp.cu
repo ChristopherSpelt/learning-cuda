@@ -1,6 +1,6 @@
 #include "cuda_utils.cuh"
 #include "epilogue.cuh"
-#include "kernels.h"
+#include "kernels/gemm.h"
 #include "loads.cuh"
 
 #include <cassert>
@@ -196,7 +196,7 @@ __global__ void shared_mem_vec_warp_kernel(int M, int N, int K, float alpha,
 }
 } // namespace
 
-void kernels::shared_mem_vec_warp(const GemmArgs &a) {
+void kernels::gemm::shared_mem_vec_warp(const GemmArgs &a) {
   assert((a.K % 4 == 0) && "shared_mem_vec_warp requires K % 4 == 0 for float4 alignment");
   assert((a.N % 4 == 0) && "shared_mem_vec_warp requires N % 4 == 0 for float4 alignment");
   constexpr int BM = 128, BK = 16, BN = 128, TM = 8, TN = 4;
