@@ -58,3 +58,10 @@ add_executable(saxpy
     src/kernels/saxpy/vec_loads.cu
 )
 target_link_libraries(saxpy PRIVATE cul_base cul_cublas)
+
+add_executable(asum
+    src/asum.cu
+    src/kernels/asum/cublas.cu
+    src/kernels/asum/naive.cu
+)
+target_link_libraries(asum PRIVATE cul_base cul_cublas)

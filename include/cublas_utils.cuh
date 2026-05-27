@@ -37,4 +37,19 @@ inline cublasHandle_t handle() {
   return h.get();
 }
 
+class ScopedPointerMode {
+public:
+  ScopedPointerMode(cublasHandle_t h, cublasPointerMode_t mode) : h_(h) {
+    CUBLAS_CHECK(cublasGetPointerMode(h_, &prev_));
+    CUBLAS_CHECK(cublasSetPointerMode(h_, mode));
+  }
+  ~ScopedPointerMode() { cublasSetPointerMode(h_, prev_); }
+  ScopedPointerMode(const ScopedPointerMode &) = delete;
+  ScopedPointerMode &operator=(const ScopedPointerMode &) = delete;
+
+private:
+  cublasHandle_t h_;
+  cublasPointerMode_t prev_;
+};
+
 } // namespace cul::cublas_utils

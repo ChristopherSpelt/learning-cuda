@@ -27,8 +27,8 @@ struct Result {
 [[nodiscard]] constexpr double gemm_flops(int M, int N, int K) {
   return 2.0 * double(M) * double(N) * double(K);
 }
-
 [[nodiscard]] constexpr double saxpy_bytes(int n) { return 12.0 * double(n); }
+[[nodiscard]] constexpr double asum_bytes(int n) { return 4.0 * double(n); }
 
 class CudaTimer {
 public:
