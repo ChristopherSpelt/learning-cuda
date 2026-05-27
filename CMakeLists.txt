@@ -63,5 +63,6 @@ add_executable(asum
     src/asum.cu
     src/kernels/asum/cublas.cu
     src/kernels/asum/naive.cu
+    src/kernels/asum/shared_mem.cu
 )
 target_link_libraries(asum PRIVATE cul_base cul_cublas)

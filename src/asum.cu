@@ -11,6 +11,7 @@ int main() {
   constexpr AsumKernel registry[] = {
       {"cuBLAS", &kernels::asum::cublas},
       {"naive", &kernels::asum::naive},
+      {"shared mem", &kernels::asum::shared_mem},
   };
 
   for (const auto &k : registry) {
