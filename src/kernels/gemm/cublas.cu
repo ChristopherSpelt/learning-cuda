@@ -1,5 +1,5 @@
 #include "cublas_utils.cuh"
-#include "gemm_cublas.h"
+#include "kernels/gemm.h"
 
 #include <cublas_v2.h>
 

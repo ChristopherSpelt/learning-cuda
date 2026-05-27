@@ -8,7 +8,7 @@
 
 namespace cul::numerics {
 
-inline std::vector<float> random_matrix(int rows, int cols, int seed) {
+inline std::vector<float> random_vector(int rows, int cols, int seed) {
 
   std::mt19937 gen(seed);
   std::normal_distribution<float> dist(0.0f, 1.0f);

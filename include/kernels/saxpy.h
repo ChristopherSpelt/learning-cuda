@@ -4,6 +4,8 @@
 
 namespace cul::kernels::saxpy {
 
+void cublas(const SaxpyArgs &);
+
 void naive(const SaxpyArgs &);
 
 void vec_loads(const SaxpyArgs &);

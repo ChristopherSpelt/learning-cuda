@@ -1,5 +1,5 @@
-#include "asum_cublas.h"
 #include "cublas_utils.cuh"
+#include "kernels/asum.h"
 
 #include <cublas_v2.h>
 

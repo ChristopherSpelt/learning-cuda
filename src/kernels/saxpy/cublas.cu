@@ -1,5 +1,5 @@
 #include "cublas_utils.cuh"
-#include "saxpy_cublas.h"
+#include "kernels/saxpy.h"
 
 #include <cublas_v2.h>
 

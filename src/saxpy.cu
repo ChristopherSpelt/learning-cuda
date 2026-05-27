@@ -1,5 +1,5 @@
-#include "harness.h"
 #include "kernels/saxpy.h"
+#include "saxpy_harness.h"
 
 #include <cstdlib>
 

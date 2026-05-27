@@ -1,5 +1,4 @@
-#include "gemm_cublas.h"
-#include "harness.h"
+#include "gemm_harness.h"
 #include "kernels/gemm.h"
 
 #include <cstdlib>

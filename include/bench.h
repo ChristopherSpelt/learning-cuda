@@ -1,6 +1,7 @@
 #pragma once
 
 #include "cuda_utils.cuh"
+#include <cstddef>
 #include <limits>
 #include <string_view>
 
@@ -24,11 +25,11 @@ struct Result {
   std::string_view units;
 };
 
-[[nodiscard]] constexpr double gemm_flops(int M, int N, int K) {
+[[nodiscard]] constexpr double gemm_flops(std::size_t M, std::size_t N, std::size_t K) {
   return 2.0 * double(M) * double(N) * double(K);
 }
-[[nodiscard]] constexpr double saxpy_bytes(int n) { return 12.0 * double(n); }
-[[nodiscard]] constexpr double asum_bytes(int n) { return 4.0 * double(n); }
+[[nodiscard]] constexpr double saxpy_bytes(std::size_t n) { return 12.0 * double(n); }
+[[nodiscard]] constexpr double asum_bytes(std::size_t n) { return 4.0 * double(n); }
 
 class CudaTimer {
 public:

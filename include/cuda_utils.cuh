@@ -7,13 +7,15 @@
 
 namespace cul::cuda_utils {
 
+[[noreturn]] inline void fail(cudaError_t code, const char *file, int line) {
+  std::cerr << "CUDA error " << cudaGetErrorName(code) << ": " << cudaGetErrorString(code)
+            << " at " << file << ":" << line << "\n";
+  std::exit(EXIT_FAILURE);
+}
+
 inline void check(cudaError_t code, const char *file, int line) {
-  if (code != cudaSuccess) {
-    std::cerr << "CUDA error " << cudaGetErrorName(code) << ": "
-              << cudaGetErrorString(code) << " at " << file << ":" << line
-              << "\n";
-    exit(EXIT_FAILURE);
-  }
+  if (code != cudaSuccess)
+    fail(code, file, line);
 }
 
 template <typename A, typename B> constexpr auto ceil_div(A a, B b) {

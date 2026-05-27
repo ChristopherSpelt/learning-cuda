@@ -1,4 +1,4 @@
-#include "harness.h"
+#include "asum_harness.h"
 #include "kernels/asum.h"
 
 #include <cstdlib>

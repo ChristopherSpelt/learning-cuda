@@ -11,12 +11,15 @@
 
 namespace cul::cublas_utils {
 
+[[noreturn]] inline void fail(cublasStatus_t status, const char *file, int line) {
+  std::cerr << "cuBLAS error " << cublasGetStatusName(status) << ": "
+            << cublasGetStatusString(status) << " at " << file << ":" << line << "\n";
+  std::exit(EXIT_FAILURE);
+}
+
 inline void check(cublasStatus_t status, const char *file, int line) {
-  if (status != CUBLAS_STATUS_SUCCESS) {
-    std::cerr << "cuBLAS error " << cublasGetStatusName(status) << ": "
-              << cublasGetStatusString(status) << " at " << file << ":" << line << "\n";
-    exit(EXIT_FAILURE);
-  }
+  if (status != CUBLAS_STATUS_SUCCESS)
+    fail(status, file, line);
 }
 
 class CublasHandle {
