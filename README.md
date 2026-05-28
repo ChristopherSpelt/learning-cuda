@@ -8,9 +8,9 @@ from a naive baseline through successive optimizations. The kernels are in
 
 - [saxpy (αx + y)](docs/saxpy.md): naive, grid-stride loop,
   vectorized loads, and a comparison to cuBLAS.
-- [Sum of elements (asum)](docs/asum.md): naive, block reduction,
+- [Sum of elements (sasum)](docs/sasum.md): naive, block reduction,
   grid-stride loop, warp reduction, and a comparison to cuBLAS.
-- [Matrix multiplication (gemm)](docs/gemm.md): naive, block tiling,
+- [Matrix multiplication (sgemm)](docs/sgemm.md): naive, block tiling,
   1D and 2D thread tiling, vectorized loads, warp tiling, and a comparison to cuBLAS.
 
 ## References
@@ -35,5 +35,5 @@ The default target is `sm_86` (RTX 3090). Override with
 Run any of the three executables to see the benchmark output:
 
     ./build/saxpy
-    ./build/asum
-    ./build/gemm
+    ./build/sasum
+    ./build/sgemm

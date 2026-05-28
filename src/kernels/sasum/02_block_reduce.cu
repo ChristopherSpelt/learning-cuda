@@ -1,5 +1,5 @@
 #include "cuda_utils.cuh"
-#include "kernels/asum.h"
+#include "kernels/sasum.h"
 
 namespace cul {
 namespace {
@@ -33,7 +33,7 @@ __global__ void block_reduce_kernel(int n, const float *__restrict__ x, float *_
 }
 } // namespace
 
-void kernels::asum::block_reduce(const AsumArgs &a) {
+void kernels::sasum::block_reduce(const SasumArgs &a) {
 
   // Clear any garbage value that still possibly sits in result.
   CUDA_CHECK(cudaMemset(a.result, 0, sizeof(float)));

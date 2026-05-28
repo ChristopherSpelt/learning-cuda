@@ -4,17 +4,17 @@
 
 namespace cul {
 
-struct AsumArgs {
+struct SasumArgs {
   int n;
   const float *x;
   float *result;
 };
 
-using AsumLaunch = void (*)(const AsumArgs &);
+using SasumLaunch = void (*)(const SasumArgs &);
 
-struct AsumKernel {
+struct SasumKernel {
   std::string_view name;
-  AsumLaunch launch;
+  SasumLaunch launch;
 };
 
 } // namespace cul

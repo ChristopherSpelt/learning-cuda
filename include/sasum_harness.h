@@ -1,9 +1,9 @@
 #pragma once
 
-#include "asum_types.h"
+#include "sasum_types.h"
 #include "bench.h"
 #include "cuda_utils.cuh"
-#include "kernels/asum.h"
+#include "kernels/sasum.h"
 #include "numerics.h"
 
 #include <thrust/copy.h>
@@ -16,36 +16,36 @@
 
 namespace cul {
 
-class AsumHarness {
+class SasumHarness {
 public:
-  AsumHarness(int n)
+  SasumHarness(int n)
       : n_(n), x_(numerics::random_vector(n, 1, 1)), result_ref_(0), xd_(x_.begin(), x_.end()),
         resultd_(1) {
 
     auto *xd_ptr = thrust::raw_pointer_cast(xd_.data());
     auto *resultd_ptr = thrust::raw_pointer_cast(resultd_.data());
 
-    AsumArgs ref_args{
+    SasumArgs ref_args{
         .n = n_,
         .x = xd_ptr,
         .result = resultd_ptr,
     };
 
-    kernels::asum::cublas(ref_args);
+    kernels::sasum::cublas(ref_args);
     CUDA_CHECK(cudaDeviceSynchronize());
     result_ref_ = resultd_[0];
 
-    std::cout << "[reference: cuBLAS asum, n=" << n_ << "]\n\n";
+    std::cout << "[reference: cuBLAS sasum, n=" << n_ << "]\n\n";
   }
 
-  AsumHarness(const AsumHarness &) = delete;
-  AsumHarness &operator=(const AsumHarness &) = delete;
+  SasumHarness(const SasumHarness &) = delete;
+  SasumHarness &operator=(const SasumHarness &) = delete;
 
-  void run(const AsumKernel &kernel) {
+  void run(const SasumKernel &kernel) {
     auto *xd_ptr = thrust::raw_pointer_cast(xd_.data());
     auto *resultd_ptr = thrust::raw_pointer_cast(resultd_.data());
 
-    AsumArgs check_args{
+    SasumArgs check_args{
         .n = n_,
         .x = xd_ptr,
         .result = resultd_ptr,
@@ -63,7 +63,7 @@ public:
     }
 
     auto launch = [&] { kernel.launch(check_args); };
-    const auto result = bench::run(launch, bench::gbs(bench::asum_bytes(n_)));
+    const auto result = bench::run(launch, bench::gbs(bench::sasum_bytes(n_)));
 
     std::cout << std::left << std::setw(22) << kernel.name << std::right << "  rel diff "
               << std::scientific << std::setprecision(2) << reldiff << "  " << std::fixed

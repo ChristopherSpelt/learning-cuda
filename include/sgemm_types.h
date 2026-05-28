@@ -4,7 +4,7 @@
 
 namespace cul {
 
-struct GemmArgs {
+struct SgemmArgs {
   int M, N, K;
   float alpha, beta;
   const float *A;
@@ -12,11 +12,11 @@ struct GemmArgs {
   float *C;
 };
 
-using GemmLaunch = void (*)(const GemmArgs &);
+using SgemmLaunch = void (*)(const SgemmArgs &);
 
-struct GemmKernel {
+struct SgemmKernel {
   std::string_view name;
-  GemmLaunch launch;
+  SgemmLaunch launch;
 };
 
 } // namespace cul

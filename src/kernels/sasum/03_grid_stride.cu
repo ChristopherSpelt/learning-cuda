@@ -1,5 +1,5 @@
 #include "cuda_utils.cuh"
-#include "kernels/asum.h"
+#include "kernels/sasum.h"
 
 namespace cul {
 namespace {
@@ -38,7 +38,7 @@ __global__ void grid_stride_kernel(int n, const float *__restrict__ x, float *__
 }
 } // namespace
 
-void kernels::asum::grid_stride(const AsumArgs &a) {
+void kernels::sasum::grid_stride(const SasumArgs &a) {
 
   // Clear any garbage value that still possibly sits in result.
   CUDA_CHECK(cudaMemset(a.result, 0, sizeof(float)));

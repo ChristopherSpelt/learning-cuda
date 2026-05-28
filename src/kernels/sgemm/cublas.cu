@@ -1,5 +1,5 @@
 #include "cublas_utils.cuh"
-#include "kernels/gemm.h"
+#include "kernels/sgemm.h"
 
 #include <cublas_v2.h>
 
@@ -26,15 +26,15 @@ void cublas_sgemm_ex_row_major(cublasComputeType_t compute_type, int M, int N, i
 
 } // namespace
 
-void kernels::gemm::cublas_pedantic(const GemmArgs &a) {
+void kernels::sgemm::cublas_pedantic(const SgemmArgs &a) {
   cublas_sgemm_row_major(CUBLAS_PEDANTIC_MATH, a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
 }
 
-void kernels::gemm::cublas_default(const GemmArgs &a) {
+void kernels::sgemm::cublas_default(const SgemmArgs &a) {
   cublas_sgemm_row_major(CUBLAS_DEFAULT_MATH, a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
 }
 
-void kernels::gemm::cublas_tf32(const GemmArgs &a) {
+void kernels::sgemm::cublas_tf32(const SgemmArgs &a) {
   cublas_sgemm_ex_row_major(CUBLAS_COMPUTE_32F_FAST_TF32, a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta,
                             a.C);
 }

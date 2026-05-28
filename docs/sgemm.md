@@ -165,7 +165,7 @@ naive_kernel(int M, int N, int K, float alpha, const float *__restrict__ A,
 
 The launch code for this kernel is as follows.
 ```cpp
-void kernels::naive(const GemmArgs &a) {
+void kernels::sgemm::naive(const SgemmArgs &a) {
   constexpr int BLOCKSIZE = 32;
 
   dim3 block(BLOCKSIZE * BLOCKSIZE);

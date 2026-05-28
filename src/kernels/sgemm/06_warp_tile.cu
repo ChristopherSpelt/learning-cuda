@@ -1,6 +1,6 @@
 #include "cuda_utils.cuh"
 #include "epilogue.cuh"
-#include "kernels/gemm.h"
+#include "kernels/sgemm.h"
 #include "loads.cuh"
 
 #include <cassert>
@@ -195,7 +195,7 @@ __global__ void warp_tile_kernel(int M, int N, int K, float alpha, const float *
 }
 } // namespace
 
-void kernels::gemm::warp_tile(const GemmArgs &a) {
+void kernels::sgemm::warp_tile(const SgemmArgs &a) {
   assert((a.K % 4 == 0) && "warp_tile requires K % 4 == 0 for float4 alignment");
   assert((a.N % 4 == 0) && "warp_tile requires N % 4 == 0 for float4 alignment");
   constexpr int BM = 128, BK = 16, BN = 128, TM = 8, TN = 4;

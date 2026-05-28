@@ -1,6 +1,6 @@
 #include "cuda_utils.cuh"
 #include "epilogue.cuh"
-#include "kernels/gemm.h"
+#include "kernels/sgemm.h"
 
 namespace cul {
 namespace {
@@ -70,7 +70,7 @@ __global__ void block_tile_kernel(int M, int N, int K, float alpha,
 }
 } // namespace
 
-void kernels::gemm::block_tile(const GemmArgs &a) {
+void kernels::sgemm::block_tile(const SgemmArgs &a) {
   constexpr int BLOCKSIZE = 32;
 
   dim3 block(BLOCKSIZE * BLOCKSIZE);

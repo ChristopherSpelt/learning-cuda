@@ -1,6 +1,6 @@
 #include "cuda_utils.cuh"
 #include "epilogue.cuh"
-#include "kernels/gemm.h"
+#include "kernels/sgemm.h"
 
 namespace cul {
 namespace {
@@ -33,7 +33,7 @@ __global__ void naive_kernel(int M, int N, int K, float alpha, const float *__re
 }
 } // namespace
 
-void kernels::gemm::naive(const GemmArgs &a) {
+void kernels::sgemm::naive(const SgemmArgs &a) {
   constexpr int BLOCKSIZE = 32;
 
   dim3 block(BLOCKSIZE * BLOCKSIZE);

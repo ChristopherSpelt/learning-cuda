@@ -1,6 +1,6 @@
 #include "cuda_utils.cuh"
 #include "epilogue.cuh"
-#include "kernels/gemm.h"
+#include "kernels/sgemm.h"
 
 namespace cul {
 namespace {
@@ -86,7 +86,7 @@ __global__ void thread_tile_1d_kernel(int M, int N, int K, float alpha, const fl
 }
 } // namespace
 
-void kernels::gemm::thread_tile_1d(const GemmArgs &a) {
+void kernels::sgemm::thread_tile_1d(const SgemmArgs &a) {
   constexpr int BM = 64, BK = 8, BN = 64, TM = 8;
   constexpr int NUM_THREADS = BN * BM / TM;
 

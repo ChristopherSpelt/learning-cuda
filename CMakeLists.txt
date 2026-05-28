@@ -39,17 +39,17 @@ target_compile_options(cul_base INTERFACE
 add_library(cul_cublas INTERFACE)
 target_link_libraries(cul_cublas INTERFACE CUDA::cublas)
 
-add_executable(gemm
-    src/gemm.cu
-    src/kernels/gemm/cublas.cu
-    src/kernels/gemm/01_naive.cu
-    src/kernels/gemm/02_block_tile.cu
-    src/kernels/gemm/03_thread_tile_1d.cu
-    src/kernels/gemm/04_thread_tile_2d.cu
-    src/kernels/gemm/05_vec_loads.cu
-    src/kernels/gemm/06_warp_tile.cu
+add_executable(sgemm
+    src/sgemm.cu
+    src/kernels/sgemm/cublas.cu
+    src/kernels/sgemm/01_naive.cu
+    src/kernels/sgemm/02_block_tile.cu
+    src/kernels/sgemm/03_thread_tile_1d.cu
+    src/kernels/sgemm/04_thread_tile_2d.cu
+    src/kernels/sgemm/05_vec_loads.cu
+    src/kernels/sgemm/06_warp_tile.cu
 )
-target_link_libraries(gemm PRIVATE cul_base cul_cublas)
+target_link_libraries(sgemm PRIVATE cul_base cul_cublas)
 
 add_executable(saxpy
     src/saxpy.cu
@@ -60,12 +60,12 @@ add_executable(saxpy
 )
 target_link_libraries(saxpy PRIVATE cul_base cul_cublas)
 
-add_executable(asum
-    src/asum.cu
-    src/kernels/asum/cublas.cu
-    src/kernels/asum/01_naive.cu
-    src/kernels/asum/02_block_reduce.cu
-    src/kernels/asum/03_grid_stride.cu
-    src/kernels/asum/04_warp_reduce.cu
+add_executable(sasum
+    src/sasum.cu
+    src/kernels/sasum/cublas.cu
+    src/kernels/sasum/01_naive.cu
+    src/kernels/sasum/02_block_reduce.cu
+    src/kernels/sasum/03_grid_stride.cu
+    src/kernels/sasum/04_warp_reduce.cu
 )
-target_link_libraries(asum PRIVATE cul_base cul_cublas)
+target_link_libraries(sasum PRIVATE cul_base cul_cublas)

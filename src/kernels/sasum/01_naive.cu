@@ -1,5 +1,5 @@
 #include "cuda_utils.cuh"
-#include "kernels/asum.h"
+#include "kernels/sasum.h"
 
 namespace cul {
 namespace {
@@ -12,7 +12,7 @@ __global__ void naive_kernel(int n, const float *__restrict__ x, float *__restri
 }
 } // namespace
 
-void kernels::asum::naive(const AsumArgs &a) {
+void kernels::sasum::naive(const SasumArgs &a) {
   CUDA_CHECK(cudaMemset(a.result, 0, sizeof(float)));
 
   constexpr int BLOCKSIZE = 1024;
