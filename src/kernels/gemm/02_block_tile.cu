@@ -14,7 +14,7 @@ namespace {
 //              slots; stores skip threads past the matrix edge.
 // clang-format on
 template <int BLOCKSIZE, bool BetaIsZero>
-__global__ void shared_mem_kernel(int M, int N, int K, float alpha,
+__global__ void block_tile_kernel(int M, int N, int K, float alpha,
                                   const float *__restrict__ A,
                                   const float *__restrict__ B, float beta,
                                   float *__restrict__ C) {
@@ -70,17 +70,17 @@ __global__ void shared_mem_kernel(int M, int N, int K, float alpha,
 }
 } // namespace
 
-void kernels::gemm::shared_mem(const GemmArgs &a) {
+void kernels::gemm::block_tile(const GemmArgs &a) {
   constexpr int BLOCKSIZE = 32;
 
   dim3 block(BLOCKSIZE * BLOCKSIZE);
   dim3 grid(cuda_utils::ceil_div(a.N, BLOCKSIZE), cuda_utils::ceil_div(a.M, BLOCKSIZE));
 
   if (a.beta == 0.0f) {
-    shared_mem_kernel<BLOCKSIZE, true>
+    block_tile_kernel<BLOCKSIZE, true>
         <<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
   } else {
-    shared_mem_kernel<BLOCKSIZE, false>
+    block_tile_kernel<BLOCKSIZE, false>
         <<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
   }
   CUDA_CHECK_LAUNCH();

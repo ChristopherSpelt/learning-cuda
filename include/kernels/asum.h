@@ -8,8 +8,10 @@ void cublas(const AsumArgs &a);
 
 void naive(const AsumArgs &);
 
-void shared_mem(const AsumArgs &a);
+void block_reduce(const AsumArgs &a);
 
-void shared_mem_grid_stride_shuffle(const AsumArgs &a);
+void grid_stride(const AsumArgs &a);
+
+void warp_reduce(const AsumArgs &a);
 
 } // namespace cul::kernels::asum

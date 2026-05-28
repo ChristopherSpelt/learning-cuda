@@ -16,18 +16,16 @@ namespace {
 //              slots; stores skip threads past the matrix edge.
 // clang-format on
 template <int BM, int BK, int BN, int TM, int TN, bool BetaIsZero>
-__global__ void shared_mem_2d_block_kernel(int M, int N, int K, float alpha,
-                                           const float *__restrict__ A,
-                                           const float *__restrict__ B,
-                                           float beta, float *__restrict__ C) {
+__global__ void thread_tile_2d_kernel(int M, int N, int K, float alpha, const float *__restrict__ A,
+                                      const float *__restrict__ B, float beta,
+                                      float *__restrict__ C) {
 
   // ---- Compile-time invariants ----------------------------------------------
   constexpr int NUM_THREADS = (BM * BN) / (TM * TN);
   constexpr int stride_A = NUM_THREADS / BK;
   constexpr int stride_B = NUM_THREADS / BN;
 
-  static_assert(NUM_THREADS * (TM * TN) == BM * BN,
-                "BM*BN must be divisible by TM*TN");
+  static_assert(NUM_THREADS * (TM * TN) == BM * BN, "BM*BN must be divisible by TM*TN");
   static_assert(stride_A * BK == NUM_THREADS, "stride_A must be integer");
   static_assert(BM % stride_A == 0, "As load sweep must cover BM exactly.");
   static_assert(stride_B * BN == NUM_THREADS, "stride_B must be integer");
@@ -70,17 +68,15 @@ __global__ void shared_mem_2d_block_kernel(int M, int N, int K, float alpha,
       const int A_row_global = block_row * BM + load_As_row + load_offset;
 
       As[(load_As_row + load_offset) * BK + load_As_col] =
-          (A_row_global < M && A_col_global < K)
-              ? A[(load_As_row + load_offset) * K + load_As_col]
-              : 0.0f;
+          (A_row_global < M && A_col_global < K) ? A[(load_As_row + load_offset) * K + load_As_col]
+                                                 : 0.0f;
     }
 
     for (int load_offset = 0; load_offset < BK; load_offset += stride_B) {
       const int B_row_global = k_tile + load_Bs_row + load_offset;
       Bs[(load_Bs_row + load_offset) * BN + load_Bs_col] =
-          (B_row_global < K && B_col_global < N)
-              ? B[(load_Bs_row + load_offset) * N + load_Bs_col]
-              : 0.0f;
+          (B_row_global < K && B_col_global < N) ? B[(load_Bs_row + load_offset) * N + load_Bs_col]
+                                                 : 0.0f;
     }
 
     __syncthreads();
@@ -101,8 +97,7 @@ __global__ void shared_mem_2d_block_kernel(int M, int N, int K, float alpha,
       for (int res_idx_m = 0; res_idx_m < TM; ++res_idx_m) {
         for (int res_idx_n = 0; res_idx_n < TN; ++res_idx_n) {
 
-          thread_result[res_idx_m * TN + res_idx_n] +=
-              reg_M[res_idx_m] * reg_N[res_idx_n];
+          thread_result[res_idx_m * TN + res_idx_n] += reg_M[res_idx_m] * reg_N[res_idx_n];
         }
       }
     }
@@ -126,7 +121,7 @@ __global__ void shared_mem_2d_block_kernel(int M, int N, int K, float alpha,
 }
 } // namespace
 
-void kernels::gemm::shared_mem_2d_block(const GemmArgs &a) {
+void kernels::gemm::thread_tile_2d(const GemmArgs &a) {
   constexpr int BM = 64, BK = 8, BN = 64, TM = 8, TN = 8;
   constexpr int NUM_THREADS = (BM * BN) / (TM * TN);
 
@@ -134,10 +129,10 @@ void kernels::gemm::shared_mem_2d_block(const GemmArgs &a) {
   dim3 grid(cuda_utils::ceil_div(a.N, BN), cuda_utils::ceil_div(a.M, BM));
 
   if (a.beta == 0.0f) {
-    shared_mem_2d_block_kernel<BM, BK, BN, TM, TN, true>
+    thread_tile_2d_kernel<BM, BK, BN, TM, TN, true>
         <<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
   } else {
-    shared_mem_2d_block_kernel<BM, BK, BN, TM, TN, false>
+    thread_tile_2d_kernel<BM, BK, BN, TM, TN, false>
         <<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
   }
   CUDA_CHECK_LAUNCH();

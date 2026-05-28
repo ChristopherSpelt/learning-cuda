@@ -42,30 +42,30 @@ target_link_libraries(cul_cublas INTERFACE CUDA::cublas)
 add_executable(gemm
     src/gemm.cu
     src/kernels/gemm/cublas.cu
-    src/kernels/gemm/naive.cu
-    src/kernels/gemm/shared_mem.cu
-    src/kernels/gemm/shared_mem_1d_block.cu
-    src/kernels/gemm/shared_mem_2d_block.cu
-    src/kernels/gemm/shared_mem_vec.cu
-    src/kernels/gemm/shared_mem_vec_warp.cu
+    src/kernels/gemm/01_naive.cu
+    src/kernels/gemm/02_block_tile.cu
+    src/kernels/gemm/03_thread_tile_1d.cu
+    src/kernels/gemm/04_thread_tile_2d.cu
+    src/kernels/gemm/05_vec_loads.cu
+    src/kernels/gemm/06_warp_tile.cu
 )
 target_link_libraries(gemm PRIVATE cul_base cul_cublas)
 
 add_executable(saxpy
     src/saxpy.cu
     src/kernels/saxpy/cublas.cu
-    src/kernels/saxpy/naive.cu
-    src/kernels/saxpy/grid_stride.cu
-    src/kernels/saxpy/vec_loads.cu
+    src/kernels/saxpy/01_naive.cu
+    src/kernels/saxpy/02_grid_stride.cu
+    src/kernels/saxpy/03_vec_loads.cu
 )
 target_link_libraries(saxpy PRIVATE cul_base cul_cublas)
 
 add_executable(asum
     src/asum.cu
     src/kernels/asum/cublas.cu
-    src/kernels/asum/naive.cu
-    src/kernels/asum/shared_mem.cu
-    src/kernels/asum/shared_mem_grid_stride.cu
-    src/kernels/asum/shared_mem_grid_stride_shuffle.cu
+    src/kernels/asum/01_naive.cu
+    src/kernels/asum/02_block_reduce.cu
+    src/kernels/asum/03_grid_stride.cu
+    src/kernels/asum/04_warp_reduce.cu
 )
 target_link_libraries(asum PRIVATE cul_base cul_cublas)

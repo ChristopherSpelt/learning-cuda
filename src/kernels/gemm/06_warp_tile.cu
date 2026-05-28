@@ -26,9 +26,8 @@ constexpr int WARPSIZE = 32;
 // clang-format on
 template <int BM, int BK, int BN, int WM, int WN, int WMITER, int WNITER, int TM, int TN,
           bool BetaIsZero, bool BoundsCheck>
-__global__ void shared_mem_vec_warp_kernel(int M, int N, int K, float alpha,
-                                           const float *__restrict__ A, const float *__restrict__ B,
-                                           float beta, float *__restrict__ C) {
+__global__ void warp_tile_kernel(int M, int N, int K, float alpha, const float *__restrict__ A,
+                                 const float *__restrict__ B, float beta, float *__restrict__ C) {
 
   // ---- Compile-time invariants ----------------------------------------------
   constexpr int NUM_THREADS = (BM * BN) / (WMITER * WNITER * TM * TN);
@@ -167,8 +166,8 @@ __global__ void shared_mem_vec_warp_kernel(int M, int N, int K, float alpha,
                                  thread_row_in_warp * TM + res_idx_m;
 
         for (int res_idx_n = 0; res_idx_n < TN; res_idx_n += 4) {
-          const int C_col_global =
-              block_col * BN + warp_col * WN + w_sub_col_idx * WSUBN + thread_col_in_warp * TN + res_idx_n;
+          const int C_col_global = block_col * BN + warp_col * WN + w_sub_col_idx * WSUBN +
+                                   thread_col_in_warp * TN + res_idx_n;
 
           if constexpr (BoundsCheck) {
             if (!(C_row_global < M && C_col_global < N))
@@ -196,9 +195,9 @@ __global__ void shared_mem_vec_warp_kernel(int M, int N, int K, float alpha,
 }
 } // namespace
 
-void kernels::gemm::shared_mem_vec_warp(const GemmArgs &a) {
-  assert((a.K % 4 == 0) && "shared_mem_vec_warp requires K % 4 == 0 for float4 alignment");
-  assert((a.N % 4 == 0) && "shared_mem_vec_warp requires N % 4 == 0 for float4 alignment");
+void kernels::gemm::warp_tile(const GemmArgs &a) {
+  assert((a.K % 4 == 0) && "warp_tile requires K % 4 == 0 for float4 alignment");
+  assert((a.N % 4 == 0) && "warp_tile requires N % 4 == 0 for float4 alignment");
   constexpr int BM = 128, BK = 16, BN = 128, TM = 8, TN = 4;
   constexpr int WM = 64, WN = 64, WMITER = 1, WNITER = 4;
   constexpr int NUM_THREADS = (BM * BN) / (WMITER * WNITER * TM * TN);
@@ -213,8 +212,7 @@ void kernels::gemm::shared_mem_vec_warp(const GemmArgs &a) {
     cuda_utils::dispatch_bool(!tile_aligned, [&](auto bounds_check) {
       constexpr bool kBetaZero = decltype(beta_zero)::value;
       constexpr bool kBoundsCheck = decltype(bounds_check)::value;
-      shared_mem_vec_warp_kernel<BM, BK, BN, WM, WN, WMITER, WNITER, TM, TN, kBetaZero,
-                                 kBoundsCheck>
+      warp_tile_kernel<BM, BK, BN, WM, WN, WMITER, WNITER, TM, TN, kBetaZero, kBoundsCheck>
           <<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
     });
   });

@@ -13,11 +13,11 @@ int main() {
       {"cuBLAS (default)", &kernels::gemm::cublas_default},
       {"cuBLAS (TF32 allowed)", &kernels::gemm::cublas_tf32},
       {"naive", &kernels::gemm::naive},
-      {"shared mem", &kernels::gemm::shared_mem},
-      {"shared mem 1D block", &kernels::gemm::shared_mem_1d_block},
-      {"shared mem 2D block", &kernels::gemm::shared_mem_2d_block},
-      {"shared mem vectorized", &kernels::gemm::shared_mem_vec},
-      {"shared mem vectorized warptiled", &kernels::gemm::shared_mem_vec_warp},
+      {"block tile", &kernels::gemm::block_tile},
+      {"thread tile 1D", &kernels::gemm::thread_tile_1d},
+      {"thread tile 2D", &kernels::gemm::thread_tile_2d},
+      {"vec loads", &kernels::gemm::vec_loads},
+      {"warp tile", &kernels::gemm::warp_tile},
   };
 
   for (const auto &k : registry) {

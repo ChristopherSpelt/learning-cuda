@@ -24,9 +24,8 @@ namespace {
 //              alignment.
 // clang-format on
 template <int BM, int BK, int BN, int TM, int TN, bool BetaIsZero, bool BoundsCheck>
-__global__ void shared_mem_vec_kernel(int M, int N, int K, float alpha, const float *__restrict__ A,
-                                      const float *__restrict__ B, float beta,
-                                      float *__restrict__ C) {
+__global__ void vec_loads_kernel(int M, int N, int K, float alpha, const float *__restrict__ A,
+                                 const float *__restrict__ B, float beta, float *__restrict__ C) {
 
   // ---- Compile-time invariants ----------------------------------------------
   constexpr int NUM_THREADS = (BM * BN) / (TM * TN);
@@ -138,9 +137,9 @@ __global__ void shared_mem_vec_kernel(int M, int N, int K, float alpha, const fl
 }
 } // namespace
 
-void kernels::gemm::shared_mem_vec(const GemmArgs &a) {
-  assert((a.K % 4 == 0) && "shared_mem_vec requires K % 4 == 0 for float4 alignment");
-  assert((a.N % 4 == 0) && "shared_mem_vec requires N % 4 == 0 for float4 alignment");
+void kernels::gemm::vec_loads(const GemmArgs &a) {
+  assert((a.K % 4 == 0) && "vec_loads requires K % 4 == 0 for float4 alignment");
+  assert((a.N % 4 == 0) && "vec_loads requires N % 4 == 0 for float4 alignment");
 
   constexpr int BM = 128, BK = 8, BN = 128, TM = 8, TN = 8;
   constexpr int NUM_THREADS = (BM * BN) / (TM * TN);
@@ -155,7 +154,7 @@ void kernels::gemm::shared_mem_vec(const GemmArgs &a) {
     cuda_utils::dispatch_bool(!tile_aligned, [&](auto bounds_check) {
       constexpr bool kBetaZero = decltype(beta_zero)::value;
       constexpr bool kBoundsCheck = decltype(bounds_check)::value;
-      shared_mem_vec_kernel<BM, BK, BN, TM, TN, kBetaZero, kBoundsCheck>
+      vec_loads_kernel<BM, BK, BN, TM, TN, kBetaZero, kBoundsCheck>
           <<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
     });
   });

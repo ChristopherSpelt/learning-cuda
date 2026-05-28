@@ -15,14 +15,12 @@ namespace {
 //              slots; stores skip threads past the matrix edge.
 // clang-format on
 template <int BM, int BK, int BN, int TM, bool BetaIsZero>
-__global__ void shared_mem_1d_block_kernel(int M, int N, int K, float alpha,
-                                           const float *__restrict__ A,
-                                           const float *__restrict__ B,
-                                           float beta, float *__restrict__ C) {
+__global__ void thread_tile_1d_kernel(int M, int N, int K, float alpha, const float *__restrict__ A,
+                                      const float *__restrict__ B, float beta,
+                                      float *__restrict__ C) {
   // ---- Compile-time invariants ----------------------------------------------
   static_assert(BM == BN, "single-shot cooperative load requires BM == BN");
-  static_assert(TM * BK == BM,
-                "NUM_THREADS (BM*BN/TM) must equal BM*BK (As slot count)");
+  static_assert(TM * BK == BM, "NUM_THREADS (BM*BN/TM) must equal BM*BK (As slot count)");
 
   // ---- Prologue: tile coordinates, pointer offsets, register init -----------
   const int block_row = blockIdx.y;
@@ -56,12 +54,10 @@ __global__ void shared_mem_1d_block_kernel(int M, int N, int K, float alpha,
     const int A_col_global = k_tile + load_As_col;
     const int B_row_global = k_tile + load_Bs_row;
 
-    As[load_As_row * BK + load_As_col] = (A_row_global < M && A_col_global < K)
-                                             ? A[load_As_row * K + load_As_col]
-                                             : 0.0f;
-    Bs[load_Bs_row * BN + load_Bs_col] = (B_row_global < K && B_col_global < N)
-                                             ? B[load_Bs_row * N + load_Bs_col]
-                                             : 0.0f;
+    As[load_As_row * BK + load_As_col] =
+        (A_row_global < M && A_col_global < K) ? A[load_As_row * K + load_As_col] : 0.0f;
+    Bs[load_Bs_row * BN + load_Bs_col] =
+        (B_row_global < K && B_col_global < N) ? B[load_Bs_row * N + load_Bs_col] : 0.0f;
 
     __syncthreads();
     A += BK;
@@ -83,15 +79,14 @@ __global__ void shared_mem_1d_block_kernel(int M, int N, int K, float alpha,
     const int C_col_global = block_col * BN + strip_col;
 
     if (C_row_global < M && C_col_global < N) {
-      epilogue::store_result<BetaIsZero>(
-          &C[(strip_row * TM + res_idx_m) * N + strip_col],
-          alpha * thread_result[res_idx_m], beta);
+      epilogue::store_result<BetaIsZero>(&C[(strip_row * TM + res_idx_m) * N + strip_col],
+                                         alpha * thread_result[res_idx_m], beta);
     }
   }
 }
 } // namespace
 
-void kernels::gemm::shared_mem_1d_block(const GemmArgs &a) {
+void kernels::gemm::thread_tile_1d(const GemmArgs &a) {
   constexpr int BM = 64, BK = 8, BN = 64, TM = 8;
   constexpr int NUM_THREADS = BN * BM / TM;
 
@@ -99,10 +94,10 @@ void kernels::gemm::shared_mem_1d_block(const GemmArgs &a) {
   dim3 grid(cuda_utils::ceil_div(a.N, BN), cuda_utils::ceil_div(a.M, BM));
 
   if (a.beta == 0.0f) {
-    shared_mem_1d_block_kernel<BM, BK, BN, TM, true>
+    thread_tile_1d_kernel<BM, BK, BN, TM, true>
         <<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
   } else {
-    shared_mem_1d_block_kernel<BM, BK, BN, TM, false>
+    thread_tile_1d_kernel<BM, BK, BN, TM, false>
         <<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
   }
   CUDA_CHECK_LAUNCH();

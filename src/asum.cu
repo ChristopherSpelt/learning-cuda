@@ -11,9 +11,9 @@ int main() {
   constexpr AsumKernel registry[] = {
       {"cuBLAS", &kernels::asum::cublas},
       {"naive", &kernels::asum::naive},
-      {"shared mem", &kernels::asum::shared_mem},
-      {"shared mem grid stride", &kernels::asum::shared_mem_grid_stride},
-      {"shared mem grid stride shuffle", &kernels::asum::shared_mem_grid_stride_shuffle},
+      {"block reduce", &kernels::asum::block_reduce},
+      {"grid stride", &kernels::asum::grid_stride},
+      {"warp reduce", &kernels::asum::warp_reduce},
   };
 
   for (const auto &k : registry) {

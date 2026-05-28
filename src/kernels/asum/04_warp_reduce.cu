@@ -4,12 +4,10 @@
 namespace cul {
 namespace {
 template <int BLOCKSIZE>
-__global__ void shared_mem_grid_stride_shuffle_kernel(int n, const float *__restrict__ x,
-                                                      float *__restrict__ result) {
+__global__ void warp_reduce_kernel(int n, const float *__restrict__ x, float *__restrict__ result) {
 
   static_assert(BLOCKSIZE > 0 && ((BLOCKSIZE & (BLOCKSIZE - 1)) == 0),
                 "BLOCKSIZE must be a power of 2");
-
 
   // ---- Prologue: thread coordinates, shared-memory cooperative load --------
   const int thread_idx = threadIdx.x;
@@ -48,7 +46,7 @@ __global__ void shared_mem_grid_stride_shuffle_kernel(int n, const float *__rest
 }
 } // namespace
 
-void kernels::asum::shared_mem_grid_stride_shuffle(const AsumArgs &a) {
+void kernels::asum::warp_reduce(const AsumArgs &a) {
 
   // Clear any garbage value that still possibly sits in result.
   CUDA_CHECK(cudaMemset(a.result, 0, sizeof(float)));
@@ -60,7 +58,7 @@ void kernels::asum::shared_mem_grid_stride_shuffle(const AsumArgs &a) {
   dim3 block(BLOCKSIZE);
   dim3 grid(SM_COUNT * BLOCKS_PER_SM * 2);
 
-  shared_mem_grid_stride_shuffle_kernel<BLOCKSIZE><<<grid, block>>>(a.n, a.x, a.result);
+  warp_reduce_kernel<BLOCKSIZE><<<grid, block>>>(a.n, a.x, a.result);
   CUDA_CHECK_LAUNCH();
 }
 
