@@ -5,14 +5,14 @@
 namespace cul {
 namespace {
 // clang-format off
-// Tile shape:  rectangular block tiles; As is BM x BK and Bs is BK x BN.
+// Tile shape:  Rectangular block tiles; As is BM x BK and Bs is BK x BN.
 // Load:        strided cooperative; each thread fills (BM*BK)/NUM_THREADS slots
 //              of As and (BK*BN)/NUM_THREADS slots of Bs per sweep, in stride_A
 //              and stride_B row windows. NUM_THREADS = (BM * BN) / (TM * TN).
-// Output:      each thread computes a TM x TN thread-tile of C.
-// Symmetry:    strided load breaks the BM == BN constraint; per-tile slot
+// Output:      Each thread computes a TM x TN thread-tile of C.
+// Symmetry:    Strided load breaks the BM == BN constraint; per-tile slot
 //              counts only need to be divisible by NUM_THREADS.
-// Bounds:      handles non-aligned M/N/K — loads zero-fill out-of-range
+// Bounds:      Handles non-aligned M/N/K — loads zero-fill out-of-range
 //              slots; stores skip threads past the matrix edge.
 // clang-format on
 template <int BM, int BK, int BN, int TM, int TN, bool BetaIsZero>

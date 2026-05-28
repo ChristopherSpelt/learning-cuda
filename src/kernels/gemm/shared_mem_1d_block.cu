@@ -5,13 +5,13 @@
 namespace cul {
 namespace {
 // clang-format off
-// Tile shape:  rectangular block tiles; As is BM x BK and Bs is BK x BN.
+// Tile shape:  Rectangular block tiles; As is BM x BK and Bs is BK x BN.
 // Load:        one-shot; each thread fills one float slot of As and one of Bs.
 //              NUM_THREADS = BM * BN / TM.
-// Output:      each thread computes a vertical strip of TM outputs of C.
-// Symmetry:    one-shot load on differently-shaped tiles forces
+// Output:      Each thread computes a vertical strip of TM outputs of C.
+// Symmetry:    One-shot load on differently-shaped tiles forces
 //              NUM_THREADS == BM*BK == BK*BN, hence BM == BN.
-// Bounds:      handles non-aligned M/N/K — loads zero-fill out-of-range
+// Bounds:      Handles non-aligned M/N/K — loads zero-fill out-of-range
 //              slots; stores skip threads past the matrix edge.
 // clang-format on
 template <int BM, int BK, int BN, int TM, bool BetaIsZero>

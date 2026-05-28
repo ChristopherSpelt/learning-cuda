@@ -5,12 +5,12 @@
 namespace cul {
 namespace {
 // clang-format off
-// Tile shape:  square block tile of BLOCKSIZE x BLOCKSIZE for As and Bs.
+// Tile shape:  Square block tile of BLOCKSIZE x BLOCKSIZE for As and Bs.
 // Load:        one-shot; each thread fills one float slot of As and one of Bs.
 //              NUM_THREADS = BLOCKSIZE * BLOCKSIZE.
-// Output:      each thread computes exactly one element of C.
-// Symmetry:    block tiles are square.
-// Bounds:      handles non-aligned M/N/K — loads zero-fill out-of-range
+// Output:      Each thread computes exactly one element of C.
+// Symmetry:    Block tiles are square.
+// Bounds:      Handles non-aligned M/N/K — loads zero-fill out-of-range
 //              slots; stores skip threads past the matrix edge.
 // clang-format on
 template <int BLOCKSIZE, bool BetaIsZero>

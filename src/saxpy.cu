@@ -11,6 +11,7 @@ int main() {
   constexpr SaxpyKernel registry[] = {
       {"cuBLAS", &kernels::saxpy::cublas},
       {"naive",  &kernels::saxpy::naive},
+      {"grid_stride",  &kernels::saxpy::grid_stride},
       {"vec_loads",  &kernels::saxpy::vec_loads},
   };
 

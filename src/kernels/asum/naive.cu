@@ -15,10 +15,10 @@ __global__ void naive_kernel(int n, const float *__restrict__ x, float *__restri
 void kernels::asum::naive(const AsumArgs &a) {
   CUDA_CHECK(cudaMemset(a.result, 0, sizeof(float)));
 
-  constexpr int NUM_THREADS = 1024;
+  constexpr int BLOCKSIZE = 1024;
 
-  dim3 block(NUM_THREADS);
-  dim3 grid(cuda_utils::ceil_div(a.n, NUM_THREADS));
+  dim3 block(BLOCKSIZE);
+  dim3 grid(cuda_utils::ceil_div(a.n, BLOCKSIZE));
 
   naive_kernel<<<grid, block>>>(a.n, a.x, a.result);
   CUDA_CHECK_LAUNCH();

@@ -8,16 +8,16 @@
 namespace cul {
 namespace {
 // clang-format off
-// Tile shape:  rectangular block tiles; As is BM x BK and Bs is BK x BN. As is stored
+// Tile shape:  Rectangular block tiles; As is BM x BK and Bs is BK x BN. As is stored
 //              transposed in shared memory so that the inner-k load is coalesced.
-// Load:        one-shot at float4 granularity; each thread fills one float4 of As and
+// Load:        One-shot at float4 granularity; each thread fills one float4 of As and
 //              one of Bs per sweep.
 //              NUM_THREADS = (BM * BN) / (TM * TN);
 //              NUM_THREADS * 4 == BM * BK == BK * BN.
-// Output:      each thread computes a TM x TN thread-tile of C; epilogue stores via float4.
-// Symmetry:    one-shot float4 load re-imposes BM == BN. Adds float4 alignment requirements on
+// Output:      Each thread computes a TM x TN thread-tile of C; epilogue stores via float4.
+// Symmetry:    One-shot float4 load re-imposes BM == BN. Adds float4 alignment requirements on
 //              BK, BN and TN.
-// Bounds:      handles non-aligned M/N/K via the BoundsCheck template parameter —
+// Bounds:      Handles non-aligned M/N/K via the BoundsCheck template parameter —
 //              loads zero-fill out-of-range float4s; stores skip threads past the
 //              matrix edge. Aligned inputs pay zero runtime cost.
 // Requires:    K % 4 == 0 and N % 4 == 0 (asserted at launcher) for safe float4

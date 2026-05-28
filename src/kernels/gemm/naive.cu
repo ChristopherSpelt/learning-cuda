@@ -5,10 +5,10 @@
 namespace cul {
 namespace {
 // clang-format off
-// Tile shape:  none (no shared memory).
-// Load:        direct global reads inside the inner-k loop; no cooperative load.
-// Output:      each thread computes exactly one element of C.
-// Symmetry:    no tile invariants; BLOCKSIZE has no restrictions.
+// Tile shape:  None (no shared memory).
+// Load:        Direct global reads inside the inner-k loop; no cooperative load.
+// Output:      Each thread computes exactly one element of C.
+// Symmetry:    No tile invariants; BLOCKSIZE has no restrictions.
 // clang-format on
 template <int BLOCKSIZE, bool BetaIsZero>
 __global__ void naive_kernel(int M, int N, int K, float alpha, const float *__restrict__ A,

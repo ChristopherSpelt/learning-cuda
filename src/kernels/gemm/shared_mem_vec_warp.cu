@@ -11,16 +11,16 @@ namespace {
 constexpr int WARPSIZE = 32;
 
 // clang-format off
-// Tile shape:  block tile BM x BN partitioned into warp-tiles WM x WN, each
+// Tile shape:  Block tile BM x BN partitioned into warp-tiles WM x WN, each
 //              partitioned into WMITER x WNITER subtiles of WSUBM x WSUBN
 //              (WSUBM = WM/WMITER, WSUBN = WN/WNITER). As stored transposed in
 //              shared memory.
-// Load:        strided cooperative at float4 granularity; each thread loads
+// Load:        Strided cooperative at float4 granularity; each thread loads
 //              (BM*BK)/(NUM_THREADS*4) float4s of As and
 //              (BK*BN)/(NUM_THREADS*4) float4s of Bs per sweep.
-// Output:      each thread computes WMITER x WNITER subtiles of TM x TN;
+// Output:      Each thread computes WMITER x WNITER subtiles of TM x TN;
 //              epilogue stores via float4.
-// Symmetry:    strided float4 load breaks BM == BN. WSUBM x WSUBN is sized so
+// Symmetry:    Strided float4 load breaks BM == BN. WSUBM x WSUBN is sized so
 //              (WSUBM/TM) * (WSUBN/TN) == WARPSIZE (one warp per subtile).
 //              Adds float4 alignment requirements on BK, BN, and TN.
 // clang-format on

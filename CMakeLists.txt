@@ -55,6 +55,7 @@ add_executable(saxpy
     src/saxpy.cu
     src/kernels/saxpy/cublas.cu
     src/kernels/saxpy/naive.cu
+    src/kernels/saxpy/grid_stride.cu
     src/kernels/saxpy/vec_loads.cu
 )
 target_link_libraries(saxpy PRIVATE cul_base cul_cublas)
@@ -64,5 +65,7 @@ add_executable(asum
     src/kernels/asum/cublas.cu
     src/kernels/asum/naive.cu
     src/kernels/asum/shared_mem.cu
+    src/kernels/asum/shared_mem_grid_stride.cu
+    src/kernels/asum/shared_mem_grid_stride_shuffle.cu
 )
 target_link_libraries(asum PRIVATE cul_base cul_cublas)

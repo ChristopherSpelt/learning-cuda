@@ -12,6 +12,8 @@ int main() {
       {"cuBLAS", &kernels::asum::cublas},
       {"naive", &kernels::asum::naive},
       {"shared mem", &kernels::asum::shared_mem},
+      {"shared mem grid stride", &kernels::asum::shared_mem_grid_stride},
+      {"shared mem grid stride shuffle", &kernels::asum::shared_mem_grid_stride_shuffle},
   };
 
   for (const auto &k : registry) {
