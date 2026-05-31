@@ -1,10 +1,10 @@
 #pragma once
 
-#include "sasum_types.h"
 #include "bench.h"
 #include "cuda_utils.cuh"
 #include "kernels/sasum.h"
 #include "numerics.h"
+#include "sasum_types.h"
 
 #include <thrust/copy.h>
 #include <thrust/device_vector.h>
@@ -63,12 +63,15 @@ public:
     }
 
     auto launch = [&] { kernel.launch(check_args); };
-    const auto result = bench::run(launch, bench::gbs(bench::sasum_bytes(n_)));
+    const auto metric = bench::gbs(bench::sasum_bytes(n_));
+    const auto cold = bench::run_cold(launch, metric);
+    const auto batch = bench::run_batch(launch, metric);
 
     std::cout << std::left << std::setw(22) << kernel.name << std::right << "  rel diff "
               << std::scientific << std::setprecision(2) << reldiff << "  " << std::fixed
-              << std::setprecision(3) << std::setw(8) << result.best_ms << " ms  "
-              << std::setprecision(2) << std::setw(7) << result.rate << " " << result.units
+              << "cold " << std::setprecision(3) << std::setw(8) << cold.best_ms << " ms  "
+              << std::setprecision(2) << std::setw(7) << cold.rate << " " << cold.units
+              << "  batch  " << std::setprecision(3) << std::setw(8) << batch.best_ms << " ms  "
               << std::endl;
   }
 

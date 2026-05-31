@@ -1,9 +1,11 @@
 #pragma once
 
 #include "cuda_utils.cuh"
+#include <algorithm>
 #include <cstddef>
 #include <limits>
 #include <string_view>
+#include <vector>
 
 namespace cul::bench {
 
@@ -37,12 +39,33 @@ public:
     CUDA_CHECK(cudaEventCreate(&start_));
     CUDA_CHECK(cudaEventCreate(&stop_));
   }
-  ~CudaTimer() {
-    cudaEventDestroy(start_);
-    cudaEventDestroy(stop_);
+  ~CudaTimer() noexcept {
+    if (start_)
+      cudaEventDestroy(start_);
+    if (stop_)
+      cudaEventDestroy(stop_);
   }
   CudaTimer(const CudaTimer &) = delete;
   CudaTimer &operator=(const CudaTimer &) = delete;
+
+  CudaTimer(CudaTimer &&o) noexcept : start_(o.start_), stop_(o.stop_) {
+    o.start_ = nullptr;
+    o.stop_ = nullptr;
+  }
+
+  CudaTimer &operator=(CudaTimer &&o) noexcept {
+    if (this != &o) {
+      if (start_)
+        cudaEventDestroy(start_);
+      if (stop_)
+        cudaEventDestroy(stop_);
+      start_ = o.start_;
+      stop_ = o.stop_;
+      o.start_ = nullptr;
+      o.stop_ = nullptr;
+    }
+    return *this;
+  }
 
   void start() { CUDA_CHECK(cudaEventRecord(start_)); }
   void stop() { CUDA_CHECK(cudaEventRecord(stop_)); }
@@ -58,16 +81,38 @@ private:
   cudaEvent_t start_{}, stop_{};
 };
 
-template <typename Launch>
-[[nodiscard]] Result run(Launch &&launch, Metric metric, double target_ms = 1000.0,
-                         int inner_iters = 4) {
+class L2Flusher {
+public:
+  L2Flusher() {
+    int dev = 0;
+    CUDA_CHECK(cudaGetDevice(&dev));
+    int l2_byte_len = 0;
+    CUDA_CHECK(cudaDeviceGetAttribute(&l2_byte_len, cudaDevAttrL2CacheSize, dev));
+    byte_len_ = static_cast<std::size_t>(l2_byte_len);
+    CUDA_CHECK(cudaMalloc(&scratch_, byte_len_));
+  }
 
+  ~L2Flusher() noexcept { cudaFree(scratch_); }
+  L2Flusher(const L2Flusher &) = delete;
+  L2Flusher &operator=(const L2Flusher &) = delete;
+
+  void flush() const { CUDA_CHECK(cudaMemsetAsync(scratch_, 0, byte_len_)); }
+
+private:
+  void *scratch_{};
+  std::size_t byte_len_{};
+};
+
+// Back to back launches under 1 timer; amortized launch overhead. Cache stays warm.
+template <typename Launch>
+[[nodiscard]] Result run_batch(Launch &&launch, Metric metric, double target_ms = 1000.0,
+                               int inner_iters = 4) {
   launch();
   CUDA_CHECK(cudaDeviceSynchronize());
 
-  CudaTimer timer;
   double best_per_iter_ms = std::numeric_limits<double>::infinity();
   double elapsed_ms = 0;
+  CudaTimer timer;
 
   while (elapsed_ms < target_ms) {
     timer.start();
@@ -78,6 +123,37 @@ template <typename Launch>
     const double window_ms = timer.elapsed_ms();
     elapsed_ms += window_ms;
     best_per_iter_ms = std::min(best_per_iter_ms, window_ms / inner_iters);
+  }
+
+  const double rate = metric.work / (best_per_iter_ms * 1e-3) / metric.scale;
+  return {best_per_iter_ms, rate, metric.units};
+}
+
+// Flush L2 before each launch, time each launch in isolation. No cross launch cache reuse.
+template <typename Launch>
+[[nodiscard]] Result run_cold(Launch &&launch, Metric metric, double target_ms = 1000.0,
+                              int inner_iters = 4) {
+
+  launch();
+  CUDA_CHECK(cudaDeviceSynchronize());
+
+  double best_per_iter_ms = std::numeric_limits<double>::infinity();
+  double elapsed_ms = 0;
+
+  L2Flusher flusher;
+  std::vector<CudaTimer> timers(inner_iters);
+  while (elapsed_ms < target_ms) {
+    for (int i = 0; i < inner_iters; ++i) {
+      flusher.flush();
+      timers[i].start();
+      launch();
+      timers[i].stop();
+    }
+    for (int i = 0; i < inner_iters; ++i) {
+      const double ms = timers[i].elapsed_ms();
+      elapsed_ms += ms;
+      best_per_iter_ms = std::min(best_per_iter_ms, ms);
+    }
   }
 
   const double rate = metric.work / (best_per_iter_ms * 1e-3) / metric.scale;

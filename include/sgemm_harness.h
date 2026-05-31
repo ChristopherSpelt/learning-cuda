@@ -2,9 +2,9 @@
 
 #include "bench.h"
 #include "cuda_utils.cuh"
-#include "sgemm_types.h"
 #include "kernels/sgemm.h"
 #include "numerics.h"
+#include "sgemm_types.h"
 
 #include <thrust/copy.h>
 #include <thrust/device_vector.h>
@@ -83,7 +83,7 @@ public:
     SgemmArgs bench_args = check_args;
     bench_args.beta = 0.0f;
     auto launch = [&] { kernel.launch(bench_args); };
-    const auto result = bench::run(launch, bench::tflops(bench::sgemm_flops(M_, N_, K_)));
+    const auto result = bench::run_batch(launch, bench::tflops(bench::sgemm_flops(M_, N_, K_)));
 
     std::cout << std::left << std::setw(22) << kernel.name << std::right << "  rel RMSE "
               << std::scientific << std::setprecision(2) << rmse << "  " << std::fixed

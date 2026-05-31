@@ -68,12 +68,15 @@ public:
     }
 
     auto launch = [&] { kernel.launch(check_args); };
-    const auto result = bench::run(launch, bench::gbs(bench::saxpy_bytes(n_)));
+    const auto metric = bench::gbs(bench::saxpy_bytes(n_));
+    const auto cold = bench::run_cold(launch, metric);
+    const auto batch = bench::run_batch(launch, metric);
 
     std::cout << std::left << std::setw(22) << kernel.name << std::right << "  rel RMSE "
               << std::scientific << std::setprecision(2) << rmse << "  " << std::fixed
-              << std::setprecision(3) << std::setw(8) << result.best_ms << " ms  "
-              << std::setprecision(2) << std::setw(7) << result.rate << " " << result.units
+              << "cold " << std::setprecision(3) << std::setw(8) << cold.best_ms << " ms  "
+              << std::setprecision(2) << std::setw(7) << cold.rate << " " << cold.units
+              << "  batch  " << std::setprecision(3) << std::setw(8) << batch.best_ms << " ms  "
               << std::endl;
   }
 
