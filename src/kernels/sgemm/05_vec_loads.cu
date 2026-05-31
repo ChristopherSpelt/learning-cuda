@@ -3,8 +3,6 @@
 #include "kernels/sgemm.h"
 #include "loads.cuh"
 
-#include <cassert>
-
 namespace cul {
 namespace {
 // clang-format off
@@ -138,8 +136,8 @@ __global__ void vec_loads_kernel(int M, int N, int K, float alpha, const float *
 } // namespace
 
 void kernels::sgemm::vec_loads(const SgemmArgs &a) {
-  assert((a.K % 4 == 0) && "vec_loads requires K % 4 == 0 for float4 alignment");
-  assert((a.N % 4 == 0) && "vec_loads requires N % 4 == 0 for float4 alignment");
+  CUL_REQUIRE(a.K % 4 == 0, "vec_loads requires K % 4 == 0 for float4 alignment");
+  CUL_REQUIRE(a.N % 4 == 0, "vec_loads requires N % 4 == 0 for float4 alignment");
 
   constexpr int BM = 128, BK = 8, BN = 128, TM = 8, TN = 8;
   constexpr int NUM_THREADS = (BM * BN) / (TM * TN);

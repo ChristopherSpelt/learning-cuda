@@ -11,6 +11,7 @@
 
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <vector>
 
 namespace cul {
@@ -22,6 +23,11 @@ public:
         B_(numerics::random_vector(K, N, 1)), C_init_(numerics::random_vector(M, N, 2)),
         C_ref_(std::size_t(M) * N), C_scratch_(std::size_t(M) * N), Ad_(A_.begin(), A_.end()),
         Bd_(B_.begin(), B_.end()), Cd_(C_init_.begin(), C_init_.end()) {
+    const auto fits = [](std::size_t a, std::size_t b) {
+      return a * b <= static_cast<std::size_t>(std::numeric_limits<int>::max());
+    };
+    CUL_REQUIRE(fits(M, K) && fits(K, N) && fits(M, N),
+                "M*K, K*N and M*N must each fit in int (kernel index math is 32-bit)");
 
     auto *Ad_ptr = thrust::raw_pointer_cast(Ad_.data());
     auto *Bd_ptr = thrust::raw_pointer_cast(Bd_.data());

@@ -3,6 +3,9 @@
 
 namespace cul {
 namespace {
+
+constexpr int WARPSIZE = 32;
+
 template <int BLOCKSIZE>
 __global__ void warp_reduce_kernel(int n, const float *__restrict__ x, float *__restrict__ result) {
 
@@ -13,17 +16,17 @@ __global__ void warp_reduce_kernel(int n, const float *__restrict__ x, float *__
   const int thread_idx = threadIdx.x;
   const int global_idx = BLOCKSIZE * blockIdx.x + thread_idx;
   const int total_threads = BLOCKSIZE * gridDim.x;
-  const int warp_id = threadIdx.x / warpSize;
-  const int lane_id = threadIdx.x % warpSize;
+  const int warp_id = threadIdx.x / WARPSIZE;
+  const int lane_id = threadIdx.x % WARPSIZE;
 
-  __shared__ float partial_sum_s[BLOCKSIZE / 32];
+  __shared__ float partial_sum_s[BLOCKSIZE / WARPSIZE];
 
   float sum = 0.0f;
   for (int i = global_idx; i < n; i += total_threads) {
     sum += fabsf(x[i]);
   }
 
-  for (int offset = warpSize / 2; offset > 0; offset >>= 1) {
+  for (int offset = WARPSIZE / 2; offset > 0; offset >>= 1) {
     sum += __shfl_down_sync(0xFFFFFFFF, sum, offset);
   }
   if (lane_id == 0) {
@@ -32,9 +35,9 @@ __global__ void warp_reduce_kernel(int n, const float *__restrict__ x, float *__
   __syncthreads();
 
   if (warp_id == 0) {
-    sum = (lane_id < BLOCKSIZE / warpSize) ? partial_sum_s[lane_id] : 0.0f;
+    sum = (lane_id < BLOCKSIZE / WARPSIZE) ? partial_sum_s[lane_id] : 0.0f;
 
-    for (int offset = warpSize / 2; offset > 0; offset >>= 1) {
+    for (int offset = WARPSIZE / 2; offset > 0; offset >>= 1) {
       sum += __shfl_down_sync(0xFFFFFFFF, sum, offset);
     }
 

@@ -3,8 +3,6 @@
 #include "kernels/sgemm.h"
 #include "loads.cuh"
 
-#include <cassert>
-
 namespace cul {
 namespace {
 
@@ -196,8 +194,8 @@ __global__ void warp_tile_kernel(int M, int N, int K, float alpha, const float *
 } // namespace
 
 void kernels::sgemm::warp_tile(const SgemmArgs &a) {
-  assert((a.K % 4 == 0) && "warp_tile requires K % 4 == 0 for float4 alignment");
-  assert((a.N % 4 == 0) && "warp_tile requires N % 4 == 0 for float4 alignment");
+  CUL_REQUIRE(a.K % 4 == 0, "warp_tile requires K % 4 == 0 for float4 alignment");
+  CUL_REQUIRE(a.N % 4 == 0, "warp_tile requires N % 4 == 0 for float4 alignment");
   constexpr int BM = 128, BK = 16, BN = 128, TM = 8, TN = 4;
   constexpr int WM = 64, WN = 64, WMITER = 1, WNITER = 4;
   constexpr int NUM_THREADS = (BM * BN) / (WMITER * WNITER * TM * TN);
