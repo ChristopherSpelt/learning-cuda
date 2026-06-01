@@ -15,7 +15,7 @@ __global__ void naive_kernel(int n, const float *__restrict__ x, float *__restri
 void kernels::sasum::naive(const SasumArgs &a) {
   CUDA_CHECK(cudaMemset(a.result, 0, sizeof(float)));
 
-  constexpr int BLOCKSIZE = 1024;
+  constexpr int BLOCKSIZE = 256;
 
   dim3 block(BLOCKSIZE);
   dim3 grid(cuda_utils::ceil_div(a.n, BLOCKSIZE));

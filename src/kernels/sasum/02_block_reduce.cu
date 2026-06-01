@@ -4,7 +4,8 @@
 namespace cul {
 namespace {
 template <int BLOCKSIZE>
-__global__ void block_reduce_kernel(int n, const float *__restrict__ x, float *__restrict__ result) {
+__global__ void block_reduce_kernel(int n, const float *__restrict__ x,
+                                    float *__restrict__ result) {
 
   static_assert(BLOCKSIZE > 0 && ((BLOCKSIZE & (BLOCKSIZE - 1)) == 0),
                 "BLOCKSIZE must be a power of 2");
@@ -38,7 +39,8 @@ void kernels::sasum::block_reduce(const SasumArgs &a) {
   // Clear any garbage value that still possibly sits in result.
   CUDA_CHECK(cudaMemset(a.result, 0, sizeof(float)));
 
-  constexpr int BLOCKSIZE = 1024;
+  // 256 = 100% occupancy on cc 8.6: 1536 threads/SM / 256 = 6 blocks/SM (1024 caps at 1 block = 66.7%).
+  constexpr int BLOCKSIZE = 256;
 
   dim3 block(BLOCKSIZE);
   dim3 grid(cuda_utils::ceil_div(a.n, BLOCKSIZE));

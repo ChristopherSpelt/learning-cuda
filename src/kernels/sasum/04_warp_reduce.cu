@@ -54,12 +54,14 @@ void kernels::sasum::warp_reduce(const SasumArgs &a) {
   // Clear any garbage value that still possibly sits in result.
   CUDA_CHECK(cudaMemset(a.result, 0, sizeof(float)));
 
+  // 256 = 100% occupancy on cc 8.6: 1536 threads/SM / 256 = 6 blocks/SM. SM_COUNT=82 is the RTX 3090.
+  // grid = one wave that fills the device; oversubscribing (x2/x4) only cost mid-range throughput.
   constexpr int BLOCKSIZE = 256;
   constexpr int SM_COUNT = 82;
   constexpr int BLOCKS_PER_SM = 1536 / BLOCKSIZE;
 
   dim3 block(BLOCKSIZE);
-  dim3 grid(SM_COUNT * BLOCKS_PER_SM * 2);
+  dim3 grid(SM_COUNT * BLOCKS_PER_SM);
 
   warp_reduce_kernel<BLOCKSIZE><<<grid, block>>>(a.n, a.x, a.result);
   CUDA_CHECK_LAUNCH();
