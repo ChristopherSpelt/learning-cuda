@@ -9,7 +9,6 @@
 #include <thrust/copy.h>
 #include <thrust/device_vector.h>
 
-#include <iomanip>
 #include <iostream>
 #include <limits>
 #include <vector>
@@ -48,13 +47,13 @@ public:
     CUDA_CHECK(cudaDeviceSynchronize());
     thrust::copy(Cd_.begin(), Cd_.end(), C_ref_.begin());
 
-    std::cout << "[reference: cuBLAS pedantic, " << M_ << " x " << N_ << " x " << K_ << "]\n\n";
+    std::cerr << "[reference: cuBLAS pedantic, " << M_ << " x " << N_ << " x " << K_ << "]\n\n";
   }
 
   SgemmHarness(const SgemmHarness &) = delete;
   SgemmHarness &operator=(const SgemmHarness &) = delete;
 
-  void run(const SgemmKernel &kernel) {
+  bench::Record run(const SgemmKernel &kernel) {
     auto *Ad_ptr = thrust::raw_pointer_cast(Ad_.data());
     auto *Bd_ptr = thrust::raw_pointer_cast(Bd_.data());
     auto *Cd_ptr = thrust::raw_pointer_cast(Cd_.data());
@@ -77,25 +76,16 @@ public:
     CUDA_CHECK(cudaDeviceSynchronize());
     thrust::copy(Cd_.begin(), Cd_.end(), C_scratch_.begin());
 
-    const float rmse = numerics::relative_rmse(C_scratch_, C_ref_);
-    if (rmse > kTolerance) {
-      std::cout << std::left << std::setw(22) << kernel.name << std::right << "  rel RMSE "
-                << std::scientific << std::setprecision(2) << rmse << "  FAILED\n";
-      return;
-    }
+    const float rel_err = numerics::relative_rmse(C_scratch_, C_ref_);
 
     // Benchmark with β=0: each launch overwrites C, no contraction map.
     // FLOP count is identical.
     SgemmArgs bench_args = check_args;
     bench_args.beta = 0.0f;
     auto launch = [&] { kernel.launch(bench_args); };
-    const auto result = bench::run_batch(launch, bench::tflops(bench::sgemm_flops(M_, N_, K_)));
 
-    std::cout << std::left << std::setw(22) << kernel.name << std::right << "  rel RMSE "
-              << std::scientific << std::setprecision(2) << rmse << "  " << std::fixed
-              << std::setprecision(3) << std::setw(8) << result.best_ms << " ms  "
-              << std::setprecision(2) << std::setw(7) << result.rate << " " << result.units
-              << std::endl;
+    return bench::evaluate(kernel.name, M_, rel_err, kTolerance, launch, // n = M (square sweep)
+                           bench::tflops(bench::sgemm_flops(M_, N_, K_)));
   }
 
 private:

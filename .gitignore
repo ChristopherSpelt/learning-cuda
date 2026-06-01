@@ -15,4 +15,7 @@ build/
 .cache/
 compile_commands.json
 
+# Benchmark CSVs and generated plots
+data/
+
 .DS_Store

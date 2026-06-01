@@ -10,7 +10,6 @@
 #include <thrust/device_vector.h>
 
 #include <cmath>
-#include <iomanip>
 #include <iostream>
 #include <vector>
 
@@ -35,44 +34,29 @@ public:
     CUDA_CHECK(cudaDeviceSynchronize());
     result_ref_ = resultd_[0];
 
-    std::cout << "[reference: cuBLAS sasum, n=" << n_ << "]\n\n";
+    std::cerr << "[reference: cuBLAS sasum, n=" << n_ << "]\n\n";
   }
 
   SasumHarness(const SasumHarness &) = delete;
   SasumHarness &operator=(const SasumHarness &) = delete;
 
-  void run(const SasumKernel &kernel) {
+  bench::Record run(const SasumKernel &kernel) {
     auto *xd_ptr = thrust::raw_pointer_cast(xd_.data());
     auto *resultd_ptr = thrust::raw_pointer_cast(resultd_.data());
 
-    SasumArgs check_args{
+    SasumArgs args{
         .n = n_,
         .x = xd_ptr,
         .result = resultd_ptr,
     };
 
-    // Correctness
-    kernel.launch(check_args);
+    kernel.launch(args);
     CUDA_CHECK(cudaDeviceSynchronize());
+    const float rel_err = std::fabs(resultd_[0] - result_ref_) / std::fabs(result_ref_);
 
-    const float reldiff = std::fabs(resultd_[0] - result_ref_) / std::fabs(result_ref_);
-    if (reldiff > kTolerance) {
-      std::cout << std::left << std::setw(22) << kernel.name << std::right << "  rel diff "
-                << std::scientific << std::setprecision(2) << reldiff << "  FAILED\n";
-      return;
-    }
-
-    auto launch = [&] { kernel.launch(check_args); };
-    const auto metric = bench::gbs(bench::sasum_bytes(n_));
-    const auto cold = bench::run_cold(launch, metric);
-    const auto batch = bench::run_batch(launch, metric);
-
-    std::cout << std::left << std::setw(22) << kernel.name << std::right << "  rel diff "
-              << std::scientific << std::setprecision(2) << reldiff << "  " << std::fixed
-              << "cold " << std::setprecision(3) << std::setw(8) << cold.best_ms << " ms  "
-              << std::setprecision(2) << std::setw(7) << cold.rate << " " << cold.units
-              << "  batch  " << std::setprecision(3) << std::setw(8) << batch.best_ms << " ms  "
-              << std::endl;
+    auto launch = [&] { kernel.launch(args); };
+    return bench::evaluate(kernel.name, n_, rel_err, kTolerance, launch,
+                           bench::gbs(bench::sasum_bytes(n_)));
   }
 
 private:

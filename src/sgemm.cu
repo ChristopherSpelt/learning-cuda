@@ -1,12 +1,14 @@
-#include "sgemm_harness.h"
 #include "kernels/sgemm.h"
+#include "sgemm_harness.h"
 
 #include <cstdlib>
+#include <iostream>
 
 using namespace cul;
 
-int main() {
-  SgemmHarness harness(4096, 4096, 4096);
+int main(int argc, char **argv) {
+  // Square sweep M=N=K=n. O(n^3): pass larger sizes explicitly, e.g. `./sgemm 8192`.
+  const auto args = bench::parse_args(argc, argv, {256, 512, 1024, 2048, 4096});
 
   constexpr SgemmKernel registry[] = {
       {"cuBLAS (FP32 strict)", &kernels::sgemm::cublas_pedantic},
@@ -20,9 +22,15 @@ int main() {
       {"warp tile", &kernels::sgemm::warp_tile},
   };
 
-  for (const auto &k : registry) {
-    harness.run(k);
-  }
+  if (args.csv)
+    bench::print_csv_header(std::cout);
 
+  for (int n : args.sizes) {
+    SgemmHarness harness(n, n, n);
+    for (const auto &k : registry) {
+      const auto rec = harness.run(k);
+      args.csv ? bench::print_csv_row(std::cout, rec) : bench::print_table_row(std::cout, rec);
+    }
+  }
   return EXIT_SUCCESS;
 }

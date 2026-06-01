@@ -9,7 +9,6 @@
 #include <thrust/copy.h>
 #include <thrust/device_vector.h>
 
-#include <iomanip>
 #include <iostream>
 #include <vector>
 
@@ -36,48 +35,36 @@ public:
     CUDA_CHECK(cudaDeviceSynchronize());
     thrust::copy(yd_.begin(), yd_.end(), y_ref_.begin());
 
-    std::cout << "[reference: cuBLAS saxpy, n=" << n_ << "]\n\n";
+    std::cerr << "[reference: cuBLAS saxpy, n=" << n_ << "]\n\n";
   }
 
   SaxpyHarness(const SaxpyHarness &) = delete;
   SaxpyHarness &operator=(const SaxpyHarness &) = delete;
 
-  void run(const SaxpyKernel &kernel) {
+  bench::Record run(const SaxpyKernel &kernel) {
     auto *xd_ptr = thrust::raw_pointer_cast(xd_.data());
     auto *yd_ptr = thrust::raw_pointer_cast(yd_.data());
 
     // Correctness: full αx + y against the cuBLAS reference.
     thrust::copy(y_init_.begin(), y_init_.end(), yd_.begin());
 
-    SaxpyArgs check_args{
+    SaxpyArgs args{
         .n = n_,
         .alpha = kAlpha,
         .x = xd_ptr,
         .y = yd_ptr,
     };
 
-    kernel.launch(check_args);
+    kernel.launch(args);
     CUDA_CHECK(cudaDeviceSynchronize());
     thrust::copy(yd_.begin(), yd_.end(), y_scratch_.begin());
 
-    const float rmse = numerics::relative_rmse(y_scratch_, y_ref_);
-    if (rmse > kTolerance) {
-      std::cout << std::left << std::setw(22) << kernel.name << std::right << "  rel RMSE "
-                << std::scientific << std::setprecision(2) << rmse << "  FAILED\n";
-      return;
-    }
+    const float rel_err = numerics::relative_rmse(y_scratch_, y_ref_);
 
-    auto launch = [&] { kernel.launch(check_args); };
-    const auto metric = bench::gbs(bench::saxpy_bytes(n_));
-    const auto cold = bench::run_cold(launch, metric);
-    const auto batch = bench::run_batch(launch, metric);
+    auto launch = [&] { kernel.launch(args); };
 
-    std::cout << std::left << std::setw(22) << kernel.name << std::right << "  rel RMSE "
-              << std::scientific << std::setprecision(2) << rmse << "  " << std::fixed
-              << "cold " << std::setprecision(3) << std::setw(8) << cold.best_ms << " ms  "
-              << std::setprecision(2) << std::setw(7) << cold.rate << " " << cold.units
-              << "  batch  " << std::setprecision(3) << std::setw(8) << batch.best_ms << " ms  "
-              << std::endl;
+    return bench::evaluate(kernel.name, n_, rel_err, kTolerance, launch,
+                           bench::gbs(bench::saxpy_bytes(n_)));
   }
 
 private:

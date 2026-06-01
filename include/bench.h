@@ -3,8 +3,12 @@
 #include "cuda_utils.cuh"
 #include <algorithm>
 #include <cstddef>
+#include <iomanip>
 #include <limits>
+#include <ostream>
+#include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace cul::bench {
@@ -20,12 +24,6 @@ struct Metric {
 
 [[nodiscard]] constexpr Metric tflops(double flops) { return {flops, 1e12, "TFLOP/s"}; }
 [[nodiscard]] constexpr Metric gbs(double bytes) { return {bytes, 1e9, "GB/s"}; }
-
-struct Result {
-  double best_ms;
-  double rate;
-  std::string_view units;
-};
 
 [[nodiscard]] constexpr double sgemm_flops(std::size_t M, std::size_t N, std::size_t K) {
   return 2.0 * double(M) * double(N) * double(K);
@@ -103,6 +101,27 @@ private:
   std::size_t byte_len_{};
 };
 
+struct Result {
+  double best_ms;
+  double rate;
+  std::string_view units;
+};
+
+struct Samples {
+  double best_ms = std::numeric_limits<double>::infinity();
+  double elapsed_ms = 0;
+
+  void add(double ms) {
+    elapsed_ms += ms;
+    best_ms = std::min(best_ms, ms);
+  }
+
+  [[nodiscard]] bool reached(double target_ms) const { return elapsed_ms >= target_ms; }
+  [[nodiscard]] Result result(Metric m) const {
+    return {best_ms, m.work / (best_ms * 1e-3) / m.scale, m.units};
+  }
+};
+
 // Back to back launches under 1 timer; amortized launch overhead. Cache stays warm.
 template <typename Launch>
 [[nodiscard]] Result run_batch(Launch &&launch, Metric metric, double target_ms = 1000.0,
@@ -110,23 +129,21 @@ template <typename Launch>
   launch();
   CUDA_CHECK(cudaDeviceSynchronize());
 
-  double best_per_iter_ms = std::numeric_limits<double>::infinity();
-  double elapsed_ms = 0;
+  Samples s;
   CudaTimer timer;
 
-  while (elapsed_ms < target_ms) {
+  while (!s.reached(target_ms)) {
     timer.start();
     for (int i = 0; i < inner_iters; ++i)
       launch();
     timer.stop();
 
-    const double window_ms = timer.elapsed_ms();
-    elapsed_ms += window_ms;
-    best_per_iter_ms = std::min(best_per_iter_ms, window_ms / inner_iters);
+    const double per_launch = timer.elapsed_ms() / inner_iters;
+    for (int i = 0; i < inner_iters; ++i) {
+      s.add(per_launch);
+    }
   }
-
-  const double rate = metric.work / (best_per_iter_ms * 1e-3) / metric.scale;
-  return {best_per_iter_ms, rate, metric.units};
+  return s.result(metric);
 }
 
 // Flush L2 before each launch, time each launch in isolation. No cross launch cache reuse.
@@ -137,27 +154,92 @@ template <typename Launch>
   launch();
   CUDA_CHECK(cudaDeviceSynchronize());
 
-  double best_per_iter_ms = std::numeric_limits<double>::infinity();
-  double elapsed_ms = 0;
-
+  Samples s;
   L2Flusher flusher;
   std::vector<CudaTimer> timers(inner_iters);
-  while (elapsed_ms < target_ms) {
+  while (!s.reached(target_ms)) {
     for (int i = 0; i < inner_iters; ++i) {
       flusher.flush();
       timers[i].start();
       launch();
       timers[i].stop();
     }
-    for (int i = 0; i < inner_iters; ++i) {
-      const double ms = timers[i].elapsed_ms();
-      elapsed_ms += ms;
-      best_per_iter_ms = std::min(best_per_iter_ms, ms);
+    for (auto &t : timers) {
+      s.add(t.elapsed_ms());
     }
   }
+  return s.result(metric);
+}
 
-  const double rate = metric.work / (best_per_iter_ms * 1e-3) / metric.scale;
-  return {best_per_iter_ms, rate, metric.units};
+struct Record {
+  std::string_view name;
+  int n;
+  float rel_err;
+  bool passed;
+  Result cold;
+  Result batch;
+};
+
+template <typename Launch>
+[[nodiscard]] Record evaluate(std::string_view name, int n, float rel_err, float tol,
+                              Launch &&launch, Metric metric) {
+  if (rel_err > tol) {
+    return {name, n, rel_err, false, {}, {}};
+  }
+  const Result cold = run_cold(launch, metric);
+  const Result batch = run_batch(launch, metric);
+  return {name, n, rel_err, true, cold, batch};
+}
+
+inline void print_csv_header(std::ostream &os) {
+  os << "n,kernel,rel_err,cold_ms,cold_rate,batch_ms,batch_rate\n";
+}
+
+inline void print_csv_row(std::ostream &os, const Record &r) {
+  os << r.n << ',' << r.name << ',' << r.rel_err << ',';
+  if (r.passed)
+    os << r.cold.best_ms << ',' << r.cold.rate << ',' << r.batch.best_ms << ',' << r.batch.rate;
+  else
+    os << ",,,"; // failures are a gap, not a zero
+  os << '\n';
+}
+
+inline void print_table_row(std::ostream &os, const Record &r) {
+  os << std::left << std::setw(22) << r.name << std::right << "  rel_err " << std::scientific
+     << std::setprecision(2) << r.rel_err;
+  if (!r.passed) {
+    os << "  FAILED\n";
+    return;
+  }
+  const auto seg = [&os](std::string_view label, const Result &res) {
+    os << "  " << label << ' ' << std::fixed << std::setprecision(3) << std::setw(8) << res.best_ms
+       << " ms " << std::setprecision(2) << std::setw(7) << res.rate << ' ' << res.units;
+  };
+  seg("cold", r.cold);
+  seg("batch", r.batch);
+  os << '\n';
+}
+
+struct CliArgs {
+  std::vector<int> sizes;
+  bool csv = false;
+};
+
+inline CliArgs parse_args(int argc, char **argv, std::vector<int> default_sizes) {
+  CliArgs a;
+
+  for (int i = 1; i < argc; ++i) {
+    const std::string_view arg = argv[i];
+    if (arg == "--csv") {
+      a.csv = true;
+    } else {
+      a.sizes.push_back(std::stoi(std::string(arg)));
+    }
+  }
+  if (a.sizes.empty()) {
+    a.sizes = std::move(default_sizes);
+  }
+  return a;
 }
 
 } // namespace cul::bench
