@@ -52,8 +52,8 @@ TODO
 TODO
 
 ## Results
-![sasum kernels](../figures/sasum_batch.png)
-![sasum kernels with flushed L2 cache](../figures/sasum_cold.png)
+![sasum kernels](../figures/sasum_new_batch.png)
+![sasum kernels with flushed L2 cache](../figures/sasum_new_cold.png)
 
 
 ## Naive 
