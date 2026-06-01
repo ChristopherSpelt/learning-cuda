@@ -52,14 +52,12 @@ no shared memory; each successive kernel realizes one further level of
 this hierarchy.
 
 
-## GPU
+## Performance ceiling
 
 The GPU we will use is a NVIDIA GeForce RTX 3090. Relevant specs for us are
 
 - Peak float32 throughput: 35.58 TFLOPS
 - DRAM bandwidth: 936.2 GB/s
-
-## Some calculations
 
 Assume for this section that $M = N = K = 3072$.
 
@@ -126,8 +124,11 @@ above ≈ 38 FLOP/byte are compute-bound, below it memory-bound. GEMM at
 $3072^3$ sits at AI ≈ 384, well past the ridge — the target is the
 35.58 TFLOP/s ceiling, not the bandwidth diagonal.
 
+## Results
+![sgemm kernels](../figures/sgemm.png)
 
-## A naive kernel
+
+## Naive 
 
 A CUDA kernel is a function executed once per thread. Threads are
 grouped into *warps* of 32, warps into *blocks*, and blocks into a
@@ -198,8 +199,8 @@ and each block is a $\text{BLOCKSIZE}\times\text{BLOCKSIZE}$ matrix. Consider th
 
 The picture shows the correspondence between the grid/block hierarchy and the global coordinates of $C$.
 A thread is uniquely identified by the triple `(blockIdx.y, blockIdx.x, threadIdx.x)` and is responsible
-for computing exactly one entrie $C_{i,j}$; the figure shows the mapping between the tripe to $(i,j)$. For
-ease of drawing we took $\text{BLOCKSIZE}=4$, but one should image it a $32$.
+for computing exactly one entry $C_{i,j}$; the figure shows the mapping from the triple to $(i,j)$. For
+ease of drawing we took $\text{BLOCKSIZE}=4$, but one should imagine it as $32$.
 
 Now consider a single warp: 32 consecutive threads in the block with `threadIdx.x` in $\{0,1,\dots,31\}$.
 With $\text{BLOCKSIZE}=32$ the row major linearization gives all of them `thread_row = 0` and `thread_col` running
@@ -217,10 +218,29 @@ loop all 32 threads simultaneously execute the same instruction
 
 each with its own $j$. 
 
-All 32 threads in a warp compute the same address `A[i * K + k]` since $i$ and $k$ are identical acress the warp. The 
+All 32 threads in a warp compute the same address `A[i * K + k]` since $i$ and $k$ are identical across the warp. The 
 hardware recognizes this and issues a single load. The value is fetched once and broadcasted to all 32
 threads.
 
 The 32 threads compute `B[k * N + j], B[k * N + j+1], ..., B[k * N + j + 31]`. These are 32 consecutive 
-values in memory. The hardware coalesces these 32 seperate requests into a single transaction. 
+values in memory. The hardware coalesces these 32 separate requests into a single transaction. 
 
+## Block tile
+
+TODO
+
+## Thread tile 1D
+
+TODO
+
+## Thread tile 2D
+
+TODO
+
+## Thread tile and vectorized loads
+
+TODO
+
+## Thread tile, warp tile and vectorized loads
+
+TODO
