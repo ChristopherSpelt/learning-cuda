@@ -24,4 +24,6 @@ void warp_tile(const SgemmArgs &);
 
 void double_buffer(const SgemmArgs &);
 
+void cp_async(const SgemmArgs &);
+
 } // namespace cul::kernels::sgemm

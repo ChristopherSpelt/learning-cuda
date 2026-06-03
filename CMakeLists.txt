@@ -49,6 +49,7 @@ add_executable(sgemm
     src/kernels/sgemm/05_vec_loads.cu
     src/kernels/sgemm/06_warp_tile.cu
     src/kernels/sgemm/07_double_buffer.cu
+    src/kernels/sgemm/08_cp_async.cu
 )
 target_link_libraries(sgemm PRIVATE cul_base cul_cublas)
 
