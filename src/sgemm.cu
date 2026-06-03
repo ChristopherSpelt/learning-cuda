@@ -20,6 +20,7 @@ int main(int argc, char **argv) {
       {"thread tile 2D", &kernels::sgemm::thread_tile_2d},
       {"vec loads", &kernels::sgemm::vec_loads},
       {"warp tile", &kernels::sgemm::warp_tile},
+      {"double buffer", &kernels::sgemm::double_buffer},
   };
 
   if (args.csv)

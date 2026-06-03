@@ -22,4 +22,6 @@ void vec_loads(const SgemmArgs &);
 
 void warp_tile(const SgemmArgs &);
 
+void double_buffer(const SgemmArgs &);
+
 } // namespace cul::kernels::sgemm
