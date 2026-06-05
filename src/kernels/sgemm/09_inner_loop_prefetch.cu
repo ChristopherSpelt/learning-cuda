@@ -80,8 +80,11 @@ __global__ void inner_loop_prefetch_kernel(int M, int N, int K, float alpha,
 
   float thread_result[WMITER * TM * WNITER * TN] = {0.0f};
 
-  float reg_M[2][WMITER * TM]{};
-  float reg_N[2][WNITER * TN]{};
+  float reg_M_a[WMITER * TM]{};
+  float reg_M_b[WMITER * TM]{};
+
+  float reg_N_a[WNITER * TN]{};
+  float reg_N_b[WNITER * TN]{};
 
   const int B_col_global = block_col * BN + load_Bs_col * 4;
 
@@ -121,54 +124,67 @@ __global__ void inner_loop_prefetch_kernel(int M, int N, int K, float alpha,
     // Populate registers reg_M[0][...] and reg_N[0][...]
     for (int w_sub_row_idx = 0; w_sub_row_idx < WMITER; ++w_sub_row_idx) {
       for (int i = 0; i < TM; ++i) {
-        reg_M[0][w_sub_row_idx * TM + i] =
+        reg_M_a[w_sub_row_idx * TM + i] =
             As[(warp_row * WM + w_sub_row_idx * WSUBM + thread_row_in_warp * TM + i)];
       }
     }
     for (int w_sub_col_idx = 0; w_sub_col_idx < WNITER; ++w_sub_col_idx) {
       for (int i = 0; i < TN; ++i) {
-        reg_N[0][w_sub_col_idx * TN + i] =
+        reg_N_a[w_sub_col_idx * TN + i] =
             Bs[(warp_col * WN + w_sub_col_idx * WSUBN + thread_col_in_warp * TN + i)];
       }
     }
 
     // Compute loop
-#pragma unroll
-    for (int k = 0; k < BK; ++k) {
+    //   #pragma unroll
+    for (int k = 0; k < BK; k += 2) {
 
-      if ((k + 1) < BK) {
-        // Populate registers for a warptile.
-        for (int w_sub_row_idx = 0; w_sub_row_idx < WMITER; ++w_sub_row_idx) {
-          for (int i = 0; i < TM; ++i) {
-            reg_M[(k + 1) & 1][w_sub_row_idx * TM + i] =
+      // ---- phase A: prefetch k+1 -> _b, compute k from _a ----
+      if (k + 1 < BK) {
+        for (int w_sub_row_idx = 0; w_sub_row_idx < WMITER; ++w_sub_row_idx)
+          for (int i = 0; i < TM; ++i)
+            reg_M_b[w_sub_row_idx * TM + i] =
                 As[((k + 1) * BM) +
                    (warp_row * WM + w_sub_row_idx * WSUBM + thread_row_in_warp * TM + i)];
-          }
-        }
-        for (int w_sub_col_idx = 0; w_sub_col_idx < WNITER; ++w_sub_col_idx) {
-          for (int i = 0; i < TN; ++i) {
-            reg_N[(k + 1) & 1][w_sub_col_idx * TN + i] =
+        for (int w_sub_col_idx = 0; w_sub_col_idx < WNITER; ++w_sub_col_idx)
+          for (int i = 0; i < TN; ++i)
+            reg_N_b[w_sub_col_idx * TN + i] =
                 Bs[(k + 1) * BN +
                    (warp_col * WN + w_sub_col_idx * WSUBN + thread_col_in_warp * TN + i)];
-          }
-        }
       }
-      // Warptile computation
-      for (int w_sub_row_idx = 0; w_sub_row_idx < WMITER; ++w_sub_row_idx) {
-        for (int w_sub_col_idx = 0; w_sub_col_idx < WNITER; ++w_sub_col_idx) {
-
-          for (int res_idx_m = 0; res_idx_m < TM; ++res_idx_m) {
-            for (int res_idx_n = 0; res_idx_n < TN; ++res_idx_n) {
-
+      for (int w_sub_row_idx = 0; w_sub_row_idx < WMITER; ++w_sub_row_idx)
+        for (int w_sub_col_idx = 0; w_sub_col_idx < WNITER; ++w_sub_col_idx)
+          for (int res_idx_m = 0; res_idx_m < TM; ++res_idx_m)
+            for (int res_idx_n = 0; res_idx_n < TN; ++res_idx_n)
               thread_result[(w_sub_row_idx * TM + res_idx_m) * (TN * WNITER) +
                             (w_sub_col_idx * TN) + res_idx_n] +=
-                  reg_M[k & 1][w_sub_row_idx * TM + res_idx_m] *
-                  reg_N[k & 1][w_sub_col_idx * TN + res_idx_n];
-            }
-          }
-        }
+                  reg_M_a[w_sub_row_idx * TM + res_idx_m] * reg_N_a[w_sub_col_idx * TN + res_idx_n];
+
+      // ---- phase B: prefetch k+2 -> _a, compute k+1 from _b ----
+      if (k + 2 < BK) {
+        for (int w_sub_row_idx = 0; w_sub_row_idx < WMITER; ++w_sub_row_idx)
+          for (int i = 0; i < TM; ++i)
+            reg_M_a[w_sub_row_idx * TM + i] =
+                As[((k + 2) * BM) +
+                   (warp_row * WM + w_sub_row_idx * WSUBM + thread_row_in_warp * TM + i)];
+        for (int w_sub_col_idx = 0; w_sub_col_idx < WNITER; ++w_sub_col_idx)
+          for (int i = 0; i < TN; ++i)
+            reg_N_a[w_sub_col_idx * TN + i] =
+                Bs[(k + 2) * BN +
+                   (warp_col * WN + w_sub_col_idx * WSUBN + thread_col_in_warp * TN + i)];
+      }
+      if (k + 1 < BK) {
+        for (int w_sub_row_idx = 0; w_sub_row_idx < WMITER; ++w_sub_row_idx)
+          for (int w_sub_col_idx = 0; w_sub_col_idx < WNITER; ++w_sub_col_idx)
+            for (int res_idx_m = 0; res_idx_m < TM; ++res_idx_m)
+              for (int res_idx_n = 0; res_idx_n < TN; ++res_idx_n)
+                thread_result[(w_sub_row_idx * TM + res_idx_m) * (TN * WNITER) +
+                              (w_sub_col_idx * TN) + res_idx_n] +=
+                    reg_M_b[w_sub_row_idx * TM + res_idx_m] *
+                    reg_N_b[w_sub_col_idx * TN + res_idx_n];
       }
     }
+
     __syncthreads();
   }
 
