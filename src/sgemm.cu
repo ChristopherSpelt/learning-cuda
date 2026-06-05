@@ -22,6 +22,7 @@ int main(int argc, char **argv) {
       {"warp tile", &kernels::sgemm::warp_tile},
       {"double buffer", &kernels::sgemm::double_buffer},
       {"cp async", &kernels::sgemm::cp_async},
+      {"inner loop prefetch", &kernels::sgemm::inner_loop_prefetch},
   };
 
   if (args.csv)
