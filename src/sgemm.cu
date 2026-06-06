@@ -21,8 +21,8 @@ int main(int argc, char **argv) {
       {"vec loads", &kernels::sgemm::vec_loads},
       {"warp tile", &kernels::sgemm::warp_tile},
       {"double buffer", &kernels::sgemm::double_buffer},
-      {"cp async", &kernels::sgemm::cp_async},
       {"inner loop prefetch", &kernels::sgemm::inner_loop_prefetch},
+      {"double buffer prefetch", &kernels::sgemm::double_buffer_prefetch},
   };
 
   if (args.csv)
