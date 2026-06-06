@@ -127,6 +127,18 @@ $3072^3$ sits at AI ≈ 384, well past the ridge — the target is the
 ## Results
 ![sgemm kernels](../figures/sgemm.png)
 
+| Kernel name                       | Throughput (TFLOP/s) | Throughput rel. to cuBLAS |
+|-----------------------------------|----------------------|---------------------------|
+| cuBLAS                            | 23.42                | 100%                      |
+| Naive                             | 2.17                 | 9.27%                     |
+| Block tile                        | 2.95                 | 12.60%                    |
+| Thread tile 1D                    | 8.24                 | 35.18%                    |
+| Thread tile 2D                    | 10.41                | 44.55%                    |
+| Vec loads                         | 18.31                | 78.18%                    |
+| Warp tile                         | 19.63                | 83.82%                    |
+| Double buffer                     | 19.83                | 84.67%                    |
+| Inner loop prefetch               | 19.55                | 83.48%                    |
+| Double buffer inner loop prefetch | 20.32                | 86.76%                    |
 
 ## Naive 
 
