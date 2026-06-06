@@ -30,4 +30,6 @@ void inner_loop_prefetch(const SgemmArgs &);
 
 void double_buffer_prefetch(const SgemmArgs &);
 
+void cp_async_swizzle(const SgemmArgs &);
+
 } // namespace cul::kernels::sgemm
