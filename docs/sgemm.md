@@ -127,6 +127,8 @@ $3072^3$ sits at AI ≈ 384, well past the ridge — the target is the
 ## Results
 ![sgemm kernels](../figures/sgemm.png)
 
+Results for $M=N=K=4096$.
+
 | Kernel name                       | Throughput (TFLOP/s) | Throughput rel. to cuBLAS |
 |-----------------------------------|----------------------|---------------------------|
 | cuBLAS                            | 23.42                | 100%                      |
