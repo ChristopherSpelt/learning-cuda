@@ -11,18 +11,32 @@ namespace {
 constexpr int WARPSIZE = 32;
 
 // clang-format off
+// cp.async load: copy global->shared directly, no register staging. Tackles load
+// latency, but LOST to double_buffer (the transposed-As scatter forces scalar copies).
+//
 // Tile shape:  Block tile BM x BN partitioned into warp-tiles WM x WN, each
 //              partitioned into WMITER x WNITER subtiles of WSUBM x WSUBN
 //              (WSUBM = WM/WMITER, WSUBN = WN/WNITER). As stored transposed in
 //              shared memory.
-// Load:        Strided cooperative at float4 granularity; each thread loads
-//              (BM*BK)/(NUM_THREADS*4) float4s of As and
-//              (BK*BN)/(NUM_THREADS*4) float4s of Bs per sweep.
+// Load:        Strided cooperative global->shared via cp.async. Bs: one float4
+//              (16 B) cp.async per slot. As: stored transposed, so it can't be
+//              a single float4 — 16 scalar 4-byte cp.async per thread instead
+//              (see Pipeline for why that cost it).
+// Pipeline:    cp.async (__pipeline_memcpy_async) copies global->shared directly,
+//              bypassing 07's register staging (no LDG->reg->STS); a 2-stage
+//              pipeline (wait_prior/commit) overlaps the next tile's copy with
+//              the current compute. VERDICT — this LOST to 07: cp.async copies
+//              only CONTIGUOUS chunks, so the transposed As scatter becomes 16
+//              scalar 4-byte cp.async/thread (the "transpose tax") vs Bs's clean
+//              float4, and that load overhead outweighed the staging it saved.
 // Output:      Each thread computes WMITER x WNITER subtiles of TM x TN;
 //              epilogue stores via float4.
 // Symmetry:    Strided float4 load breaks BM == BN. WSUBM x WSUBN is sized so
 //              (WSUBM/TM) * (WSUBN/TN) == WARPSIZE (one warp per subtile).
 //              Adds float4 alignment requirements on BK, BN, and TN.
+// Bounds:      Aligned sizes ONLY. BoundsCheck is applied in the epilogue, but
+//              the cp.async loads do no masking, so non-128-multiple sizes read
+//              out of bounds. (Benchmark sizes are all multiples of 128.)
 // clang-format on
 template <int BM, int BK, int BN, int WM, int WN, int WMITER, int WNITER, int TM, int TN,
           bool BetaIsZero, bool BoundsCheck>

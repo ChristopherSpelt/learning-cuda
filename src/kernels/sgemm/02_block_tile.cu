@@ -5,6 +5,9 @@
 namespace cul {
 namespace {
 // clang-format off
+// Block tiling: stage square A/B tiles in shared memory. Tackles data reuse:
+// each element is loaded from global once, then reused BLOCKSIZE times.
+//
 // Tile shape:  Square block tile of BLOCKSIZE x BLOCKSIZE for As and Bs.
 // Load:        one-shot; each thread fills one float slot of As and one of Bs.
 //              NUM_THREADS = BLOCKSIZE * BLOCKSIZE.

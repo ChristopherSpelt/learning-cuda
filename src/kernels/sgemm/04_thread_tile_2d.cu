@@ -5,6 +5,9 @@
 namespace cul {
 namespace {
 // clang-format off
+// 2D thread tiling: each thread computes a TM x TN tile as a register outer
+// product. Tackles arithmetic intensity: TM+TN shared loads feed TM x TN FMAs.
+//
 // Tile shape:  Rectangular block tiles; As is BM x BK and Bs is BK x BN.
 // Load:        strided cooperative; each thread fills (BM*BK)/NUM_THREADS slots
 //              of As and (BK*BN)/NUM_THREADS slots of Bs per sweep, in stride_A

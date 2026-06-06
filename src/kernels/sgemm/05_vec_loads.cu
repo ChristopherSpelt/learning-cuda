@@ -6,6 +6,9 @@
 namespace cul {
 namespace {
 // clang-format off
+// Vectorized loads: 128-bit float4 loads/stores, As stored transposed. Tackles
+// memory bandwidth: wider coalesced transactions and fewer load instructions.
+//
 // Tile shape:  Rectangular block tiles; As is BM x BK and Bs is BK x BN. As is stored
 //              transposed in shared memory so that the inner-k load is coalesced.
 // Load:        One-shot at float4 granularity; each thread fills one float4 of As and

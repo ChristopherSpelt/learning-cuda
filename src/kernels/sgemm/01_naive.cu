@@ -5,6 +5,9 @@
 namespace cul {
 namespace {
 // clang-format off
+// Baseline: one thread per C element, A and B re-read from global every k. No
+// data reuse, so it is DRAM-bound; everything below attacks this.
+//
 // Tile shape:  None (no shared memory).
 // Load:        Direct global reads inside the inner-k loop; no cooperative load.
 // Output:      Each thread computes exactly one element of C.

@@ -9,6 +9,10 @@ namespace {
 constexpr int WARPSIZE = 32;
 
 // clang-format off
+// Double buffering: software-pipeline the global->shared load (two shared
+// buffers + register staging). Tackles global-load latency: hidden under the
+// FMAs when occupancy is starved.
+//
 // Tile shape:  Block tile BM x BN partitioned into warp-tiles WM x WN, each
 //              partitioned into WMITER x WNITER subtiles of WSUBM x WSUBN
 //              (WSUBM = WM/WMITER, WSUBN = WN/WNITER). As stored transposed in
@@ -16,6 +20,16 @@ constexpr int WARPSIZE = 32;
 // Load:        Strided cooperative at float4 granularity; each thread loads
 //              (BM*BK)/(NUM_THREADS*4) float4s of As and
 //              (BK*BN)/(NUM_THREADS*4) float4s of Bs per sweep.
+// Pipeline:    Double-buffered (software pipelined): loads and FMAs interleave.
+//              As[2]/Bs[2] hold two K-tiles ping-pong; each iteration computes
+//              the current buffer while prefetching the next tile into per-thread
+//              staging registers (stag_A/stag_B), then commits them to the other
+//              buffer. The staging registers split the global->shared move
+//              (LDG -> reg -> STS): issue the LDG, compute, then STS afterward,
+//              so the global-load latency hides under the FMAs. One __syncthreads
+//              per K-iteration, not two — the prefetch writes the OTHER buffer,
+//              so it can't clobber the tile being read; the write-after-read
+//              barrier warp_tile needs is gone by construction.
 // Output:      Each thread computes WMITER x WNITER subtiles of TM x TN;
 //              epilogue stores via float4.
 // Symmetry:    Strided float4 load breaks BM == BN. WSUBM x WSUBN is sized so

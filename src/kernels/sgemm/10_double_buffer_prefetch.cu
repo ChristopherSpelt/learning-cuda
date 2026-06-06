@@ -9,6 +9,9 @@ namespace {
 constexpr int WARPSIZE = 32;
 
 // clang-format off
+// Two-level pipeline: double-buffer at both levels (07 + 09). Tackles global AND
+// shared load latency at once; the fastest custom kernel (~87% of cuBLAS).
+//
 // Tile shape:  Block tile BM x BN partitioned into warp-tiles WM x WN, each
 //              partitioned into WMITER x WNITER subtiles of WSUBM x WSUBN
 //              (WSUBM = WM/WMITER, WSUBN = WN/WNITER). As stored transposed in
@@ -16,6 +19,15 @@ constexpr int WARPSIZE = 32;
 // Load:        Strided cooperative at float4 granularity; each thread loads
 //              (BM*BK)/(NUM_THREADS*4) float4s of As and
 //              (BK*BN)/(NUM_THREADS*4) float4s of Bs per sweep.
+// Pipeline:    Two-level — the union of 07 and 09: both the global->shared
+//              double-buffer (As[2]/Bs[2] + staging regs, from 07) AND the
+//              shared->register double-buffer (reg_M_a/_b, reg_N_a/_b with an
+//              unroll-by-2 role-swap, from 09) run at once, so BOTH memory hops
+//              overlap the FMAs. This is the heaviest register user of these
+//              kernels, but we checked -res-usage and it has no spills.
+//              BK <= 16: it inherits 07's double-buffered shared, so BK=32 would
+//              need 64 KB of shared — over the 48 KB static cap — and fails to
+//              launch (cudaErrorInvalidPtx); a shared-memory limit, not a spill.
 // Output:      Each thread computes WMITER x WNITER subtiles of TM x TN;
 //              epilogue stores via float4.
 // Symmetry:    Strided float4 load breaks BM == BN. WSUBM x WSUBN is sized so

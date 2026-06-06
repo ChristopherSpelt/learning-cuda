@@ -9,6 +9,9 @@ namespace {
 constexpr int WARPSIZE = 32;
 
 // clang-format off
+// Warp tiling: partition the block tile into per-warp tiles/sub-tiles. Tackles
+// warp-level register reuse and ILP, the structural base the pipelines build on.
+//
 // Tile shape:  Block tile BM x BN partitioned into warp-tiles WM x WN, each
 //              partitioned into WMITER x WNITER subtiles of WSUBM x WSUBN
 //              (WSUBM = WM/WMITER, WSUBN = WN/WNITER). As stored transposed in

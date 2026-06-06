@@ -9,6 +9,9 @@ namespace {
 constexpr int WARPSIZE = 32;
 
 // clang-format off
+// Inner-loop (register) prefetch: register double-buffer the shared->register
+// loads. Tackles LDS latency: hidden under the FMAs; single shared buffer.
+//
 // Tile shape:  Block tile BM x BN partitioned into warp-tiles WM x WN, each
 //              partitioned into WMITER x WNITER subtiles of WSUBM x WSUBN
 //              (WSUBM = WM/WMITER, WSUBN = WN/WNITER). As stored transposed in
@@ -16,6 +19,18 @@ constexpr int WARPSIZE = 32;
 // Load:        Strided cooperative at float4 granularity; each thread loads
 //              (BM*BK)/(NUM_THREADS*4) float4s of As and
 //              (BK*BN)/(NUM_THREADS*4) float4s of Bs per sweep.
+// Pipeline:    Register double-buffer (software pipelined at the inner loop):
+//              the shared->register loads (reg_M/reg_N) overlap with the FMAs.
+//              Sibling of 07 one level down — 07 pipelines global->shared; this
+//              pipelines shared->register. Shared memory stays SINGLE-buffered
+//              (As/Bs, no [2]); only the registers are double-buffered, and no
+//              staging registers are needed since the prefetch never leaves the
+//              register file. Each k computes the current bank while prefetching
+//              slice k+1 into the other. Uses two NAMED banks per operand
+//              (reg_M_a/_b, reg_N_a/_b) + an unroll-by-2 role-swap, NOT a
+//              reg[2][..] array indexed by k&1: registers aren't runtime-
+//              addressable, so a dynamically-indexed register array is demoted
+//              to local memory (a spill) — which made it 5x slower.
 // Output:      Each thread computes WMITER x WNITER subtiles of TM x TN;
 //              epilogue stores via float4.
 // Symmetry:    Strided float4 load breaks BM == BN. WSUBM x WSUBN is sized so

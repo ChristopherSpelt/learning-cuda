@@ -5,6 +5,9 @@
 namespace cul {
 namespace {
 // clang-format off
+// 1D thread tiling: each thread computes a strip of TM outputs. Tackles
+// arithmetic intensity: one shared load now feeds TM FMAs.
+//
 // Tile shape:  Rectangular block tiles; As is BM x BK and Bs is BK x BN.
 // Load:        one-shot; each thread fills one float slot of As and one of Bs.
 //              NUM_THREADS = BM * BN / TM.
