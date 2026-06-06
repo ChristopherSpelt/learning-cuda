@@ -10,7 +10,7 @@ constexpr int WARPSIZE = 32;
 
 // clang-format off
 // Two-level pipeline: double-buffer at both levels (07 + 09). Tackles global AND
-// shared load latency at once; the fastest custom kernel (~87% of cuBLAS).
+// shared load latency at once; the fastest custom kernel (~92% of cuBLAS).
 //
 // Tile shape:  Block tile BM x BN partitioned into warp-tiles WM x WN, each
 //              partitioned into WMITER x WNITER subtiles of WSUBM x WSUBN
@@ -178,7 +178,9 @@ double_buffer_prefetch_kernel(int M, int N, int K, float alpha, const float *__r
       }
     }
 
-#pragma unroll
+    // Compute loop. Deliberately NOT unrolled: the rolled loop keeps
+    // stag_A/stag_B's LDGs at the top of the k-tile iteration, hidden under
+    // the FMAs; see the ptxas LDG-sink note in 09_inner_loop_prefetch.cu.
     for (int k = 0; k < BK; k += 2) {
 
       // ---- phase A: prefetch k+1 -> _b, compute k from _a ----

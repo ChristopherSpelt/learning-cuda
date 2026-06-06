@@ -150,8 +150,17 @@ __global__ void inner_loop_prefetch_kernel(int M, int N, int K, float alpha,
       }
     }
 
-    // Compute loop
-#pragma unroll
+    // Compute loop. Deliberately NOT unrolled, and that is load-bearing: with
+    // #pragma unroll the BK-loop becomes one giant basic block (~2200
+    // instructions in 10), and ptxas is free to re-schedule anything inside
+    // it. In 10, which adds staged global loads on top of this structure,
+    // ptxas used that freedom to sink the staged LDGs down next to their
+    // consuming STS (shortening the 32-register live range), re-exposing the
+    // full global-load latency at the per-tile barrier: 5-7% slower at every
+    // size (verified in SASS: the LDGs sat ~20 instructions before the STS
+    // instead of ~2300). A rolled loop is a control-flow fence ptxas will not
+    // move loads across; it is what lets the source-level pipeline survive
+    // compilation.
     for (int k = 0; k < BK; k += 2) {
 
       // ---- phase A: prefetch k+1 -> _b, compute k from _a ----

@@ -140,7 +140,7 @@ Results for $M=N=K=4096$.
 | Warp tile                         | 19.63                | 83.82%                    |
 | Double buffer                     | 19.83                | 84.67%                    |
 | Inner loop prefetch               | 19.55                | 83.48%                    |
-| Double buffer inner loop prefetch | 20.32                | 86.76%                    |
+| Double buffer inner loop prefetch | 21.68                | 92.57%                    |
 
 ## Naive 
 
