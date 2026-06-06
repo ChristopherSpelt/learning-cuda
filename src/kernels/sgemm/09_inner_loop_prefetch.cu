@@ -151,7 +151,7 @@ __global__ void inner_loop_prefetch_kernel(int M, int N, int K, float alpha,
     }
 
     // Compute loop
-    //   #pragma unroll
+#pragma unroll
     for (int k = 0; k < BK; k += 2) {
 
       // ---- phase A: prefetch k+1 -> _b, compute k from _a ----
