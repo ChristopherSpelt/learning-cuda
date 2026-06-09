@@ -220,7 +220,7 @@ void kernels::sgemm::resolve_bank(const SgemmArgs &a) {
     cuda_utils::dispatch_bool(!tile_aligned, [&](auto bounds_check) {
       constexpr bool kBetaZero = decltype(beta_zero)::value;
       constexpr bool kBoundsCheck = decltype(bounds_check)::value;
-      warp_tile_kernel<BM, BK, BN, WM, WN, WMITER, WNITER, TM, TN, kBetaZero, kBoundsCheck>
+      resolve_bank_kernel<BM, BK, BN, WM, WN, WMITER, WNITER, TM, TN, kBetaZero, kBoundsCheck>
           <<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);
     });
   });

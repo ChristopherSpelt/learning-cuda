@@ -54,6 +54,7 @@ add_executable(sgemm
     src/kernels/sgemm/09_inner_loop_prefetch.cu
     src/kernels/sgemm/10_double_buffer_prefetch.cu
     src/kernels/sgemm/11_cp_async_swizzle.cu
+    src/kernels/sgemm/12_double_buffer_prefetch_bank.cu
 )
 target_link_libraries(sgemm PRIVATE cul_base cul_cublas)
 

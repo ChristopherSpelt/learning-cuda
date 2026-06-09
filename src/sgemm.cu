@@ -20,8 +20,8 @@ int main(int argc, char **argv) {
       {"warp tile", &kernels::sgemm::warp_tile},
       {"resolve bank", &kernels::sgemm::resolve_bank},
       {"double buffer", &kernels::sgemm::double_buffer},
-      {"inner loop prefetch", &kernels::sgemm::inner_loop_prefetch},
       {"double buffer prefetch", &kernels::sgemm::double_buffer_prefetch},
+      {"double buffer prefetch bank", &kernels::sgemm::double_buffer_prefetch_bank},
   };
 
   if (args.csv)
