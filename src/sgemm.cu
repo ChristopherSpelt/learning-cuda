@@ -11,20 +11,17 @@ int main(int argc, char **argv) {
   const auto args = bench::parse_args(argc, argv, {256, 512, 1024, 2048, 4096});
 
   constexpr SgemmKernel registry[] = {
-      {"cuBLAS (FP32 strict)", &kernels::sgemm::cublas_pedantic},
       {"cuBLAS (default)", &kernels::sgemm::cublas_default},
-      {"cuBLAS (TF32 allowed)", &kernels::sgemm::cublas_tf32},
       {"naive", &kernels::sgemm::naive},
       {"block tile", &kernels::sgemm::block_tile},
       {"thread tile 1D", &kernels::sgemm::thread_tile_1d},
       {"thread tile 2D", &kernels::sgemm::thread_tile_2d},
       {"vec loads", &kernels::sgemm::vec_loads},
       {"warp tile", &kernels::sgemm::warp_tile},
+      {"resolve bank", &kernels::sgemm::resolve_bank},
       {"double buffer", &kernels::sgemm::double_buffer},
-      {"cp async", &kernels::sgemm::cp_async},
       {"inner loop prefetch", &kernels::sgemm::inner_loop_prefetch},
       {"double buffer prefetch", &kernels::sgemm::double_buffer_prefetch},
-      {"cp async swizzle", &kernels::sgemm::cp_async_swizzle},
   };
 
   if (args.csv)

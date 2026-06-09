@@ -22,6 +22,8 @@ void vec_loads(const SgemmArgs &);
 
 void warp_tile(const SgemmArgs &);
 
+void resolve_bank(const SgemmArgs &);
+
 void double_buffer(const SgemmArgs &);
 
 void cp_async(const SgemmArgs &);
