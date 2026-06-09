@@ -26,13 +26,9 @@ void resolve_bank(const SgemmArgs &);
 
 void double_buffer(const SgemmArgs &);
 
-void cp_async(const SgemmArgs &);
-
 void inner_loop_prefetch(const SgemmArgs &);
 
 void double_buffer_prefetch(const SgemmArgs &);
-
-void cp_async_swizzle(const SgemmArgs &);
 
 void double_buffer_prefetch_bank(const SgemmArgs &);
 
