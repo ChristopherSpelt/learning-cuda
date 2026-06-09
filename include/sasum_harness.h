@@ -11,6 +11,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <vector>
 
 namespace cul {
@@ -49,6 +50,10 @@ public:
         .x = xd_ptr,
         .result = resultd_ptr,
     };
+
+    // Poison the accumulator so a no-op kernel cannot inherit the previous
+    // correct value.
+    resultd_[0] = std::numeric_limits<float>::quiet_NaN();
 
     kernel.launch(args);
     CUDA_CHECK(cudaDeviceSynchronize());

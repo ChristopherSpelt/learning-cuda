@@ -37,7 +37,8 @@ inline float relative_rmse(std::span<const float> a, std::span<const float> b) {
   ref_sq_mean /= double(a.size());
 
   if (ref_sq_mean == 0.0f) {
-    return mse == 0.0f ? 0.0f : std::numeric_limits<float>::infinity();
+    // An all zero reference should never happen in our kernels
+    return std::numeric_limits<float>::infinity();
   }
 
   return float(std::sqrt(mse) / std::sqrt(ref_sq_mean));

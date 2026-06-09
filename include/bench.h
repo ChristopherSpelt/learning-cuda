@@ -2,6 +2,7 @@
 
 #include "cuda_utils.cuh"
 #include <algorithm>
+#include <charconv>
 #include <cstddef>
 #include <iomanip>
 #include <limits>
@@ -183,7 +184,9 @@ struct Record {
 template <typename Launch>
 [[nodiscard]] Record evaluate(std::string_view name, int n, float rel_err, float tol,
                               Launch &&launch, Metric metric) {
-  if (rel_err > tol) {
+
+  // We need this expression (instead of rel_err > tol) to handle NaN properly.
+  if (!(rel_err <= tol)) {
     return {name, n, rel_err, false, {}, {}};
   }
   const Result cold = run_cold(launch, metric);
@@ -225,17 +228,39 @@ struct CliArgs {
   bool csv = false;
 };
 
+[[noreturn]] inline void usage(std::string_view prog, int exit_code) {
+  std::cerr << "Usage: " << prog << " [--csv] [size...]    (sizes are positive integers)\n";
+  std::exit(exit_code);
+}
+
 inline CliArgs parse_args(int argc, char **argv, std::vector<int> default_sizes) {
   CliArgs a;
 
   for (int i = 1; i < argc; ++i) {
+
     const std::string_view arg = argv[i];
+
     if (arg == "--csv") {
       a.csv = true;
-    } else {
-      a.sizes.push_back(std::stoi(std::string(arg)));
+      continue;
     }
+    if (arg == "--help") {
+      usage(argv[0], EXIT_SUCCESS);
+    }
+    if (arg.starts_with("--")) {
+      std::cerr << "Unknown flag: '" << arg << "'\n";
+      usage(argv[0], EXIT_FAILURE);
+    }
+
+    int size = 0;
+    const auto [end, ec] = std::from_chars(arg.data(), arg.data() + arg.size(), size);
+    if (ec != std::errc{} || end != arg.data() + arg.size() || size <= 0) {
+      std::cerr << "invalid size '" << arg << "'\n";
+      usage(argv[0], EXIT_FAILURE);
+    }
+    a.sizes.push_back(size);
   }
+
   if (a.sizes.empty()) {
     a.sizes = std::move(default_sizes);
   }

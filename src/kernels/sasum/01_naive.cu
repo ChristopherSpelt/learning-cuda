@@ -8,6 +8,8 @@ __global__ void naive_kernel(int n, const float *__restrict__ x, float *__restri
   const int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
   if (idx < n)
+    // Expected to FAIL for n >~ 2^24: the single-float accumulator's half-ulp
+    // grows past typical |x|, so most addends are absorbed (rounded away).
     atomicAdd(result, fabsf(x[idx]));
 }
 } // namespace

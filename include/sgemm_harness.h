@@ -47,7 +47,12 @@ public:
     CUDA_CHECK(cudaDeviceSynchronize());
     thrust::copy(Cd_.begin(), Cd_.end(), C_ref_.begin());
 
-    std::cerr << "[reference: cuBLAS pedantic, " << M_ << " x " << N_ << " x " << K_ << "]\n\n";
+    const float ref_delta = numerics::relative_rmse(C_ref_, C_init_);
+
+    std::cerr << "[reference: cuBLAS pedantic, " << M_ << " x " << N_ << " x " << K_
+              << ", ref_delta " << ref_delta << "]\n\n";
+
+    CUL_REQUIRE(ref_delta > 2.0f, "degenerate reference data");
   }
 
   SgemmHarness(const SgemmHarness &) = delete;
@@ -82,6 +87,7 @@ public:
     // FLOP count is identical.
     SgemmArgs bench_args = check_args;
     bench_args.beta = 0.0f;
+    bench_args.alpha = 1.0f;
     auto launch = [&] { kernel.launch(bench_args); };
 
     return bench::evaluate(kernel.name, M_, rel_err, kTolerance, launch, // n = M (square sweep)
@@ -89,7 +95,7 @@ public:
   }
 
 private:
-  static constexpr float kAlpha = 1.0f;
+  static constexpr float kAlpha = 1.5f;
   static constexpr float kBeta = 0.5f;
   static constexpr float kTolerance = 1e-3f;
 

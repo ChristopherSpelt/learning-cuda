@@ -25,7 +25,10 @@ inline void check(cudaError_t code, const char *file, int line) {
   std::exit(EXIT_FAILURE);
 }
 
-template <typename A, typename B> constexpr auto ceil_div(A a, B b) { return (a + b - 1) / b; }
+// Written so that it cannot overflow near the type max. Only valid for non-negative a and positive b.
+template <typename A, typename B> [[nodiscard]] constexpr auto ceil_div(A a, B b) {
+  return a / b + (a % b != 0);
+}
 
 template <typename F> inline void dispatch_bool(bool b, F &&f) {
   if (b)
