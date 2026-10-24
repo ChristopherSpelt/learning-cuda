@@ -7,6 +7,8 @@
 using namespace cul;
 
 int main(int argc, char **argv) {
+  bench::print_device_banner(std::cerr);
+
   const auto args = bench::parse_args(
       argc, argv, {1 << 10, 1 << 13, 1 << 16, 1 << 19, 1 << 22, 1 << 25, 1 << 27});
 

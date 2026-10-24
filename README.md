@@ -27,7 +27,7 @@ Requires the CUDA Toolkit (with cuBLAS), CMake ≥ 3.25, and a C++20 compiler.
     cmake -S . -B build
     cmake --build build
 
-The default target is `sm_86` (RTX 3090). Override with
+The default target is the GPU in the build machine (`native`). Override with
 `-DCMAKE_CUDA_ARCHITECTURES=<arch>`.
 
 ## Running

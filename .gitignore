@@ -11,6 +11,8 @@ build/
 *.cubin
 *.fatbin
 
+*.sass
+
 # Editor / LSP artifacts
 .cache/
 compile_commands.json

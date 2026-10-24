@@ -22,11 +22,12 @@ __global__ void grid_stride_kernel(int n, float alpha, const float *__restrict__
 
 void kernels::saxpy::grid_stride(const SaxpyArgs &a) {
   constexpr int BLOCKSIZE = 256;
-  constexpr int SM_COUNT = 82;
-  constexpr int BLOCKS_PER_SM = 1536 / BLOCKSIZE;
+  constexpr int OVERSUB = 2;
+  static const int grid_size =
+      cuda_utils::sm_count() * cuda_utils::blocks_per_sm(grid_stride_kernel, BLOCKSIZE) * OVERSUB;
 
   dim3 block(BLOCKSIZE);
-  dim3 grid(SM_COUNT * BLOCKS_PER_SM * 2);
+  dim3 grid(grid_size);
 
   grid_stride_kernel<<<grid, block>>>(a.n, a.alpha, a.x, a.y);
   CUDA_CHECK_LAUNCH();

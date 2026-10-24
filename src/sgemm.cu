@@ -7,6 +7,8 @@
 using namespace cul;
 
 int main(int argc, char **argv) {
+  bench::print_device_banner(std::cerr);
+
   // Square sweep M=N=K=n. O(n^3): pass larger sizes explicitly, e.g. `./sgemm 8192`.
   const auto args = bench::parse_args(argc, argv, {256, 512, 1024, 2048, 4096});
 

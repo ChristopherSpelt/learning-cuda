@@ -1,8 +1,9 @@
 cmake_minimum_required(VERSION 3.25)
 
-# Default to sm_86 (RTX 3090). Override with -DCMAKE_CUDA_ARCHITECTURES=...
+# Default to the GPU in this machine. 
+# Override with -DCMAKE_CUDA_ARCHITECTURES=86 (RTX 3090) or 121 (GB10).
 if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-    set(CMAKE_CUDA_ARCHITECTURES 86)
+    set(CMAKE_CUDA_ARCHITECTURES native)
 endif()
 
 project(learning_cuda LANGUAGES CXX CUDA)

@@ -38,11 +38,12 @@ __global__ void vec_loads_kernel(int n, float alpha, const float *__restrict__ x
 
 void kernels::saxpy::vec_loads(const SaxpyArgs &a) {
   constexpr int BLOCKSIZE = 256;
-  constexpr int SM_COUNT = 82;
-  constexpr int BLOCKS_PER_SM = 1536 / BLOCKSIZE;
+  constexpr int OVERSUB = 2;
+  static const int grid_size =
+      cuda_utils::sm_count() * cuda_utils::blocks_per_sm(vec_loads_kernel, BLOCKSIZE) * OVERSUB;
 
   dim3 block(BLOCKSIZE);
-  dim3 grid(SM_COUNT * BLOCKS_PER_SM * 2);
+  dim3 grid(grid_size);
 
   vec_loads_kernel<<<grid, block>>>(a.n, a.alpha, a.x, a.y);
   CUDA_CHECK_LAUNCH();

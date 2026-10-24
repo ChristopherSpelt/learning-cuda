@@ -102,6 +102,35 @@ private:
   std::size_t byte_len_{};
 };
 
+inline void print_device_banner(std::ostream &os) {
+  int dev = 0;
+  CUDA_CHECK(cudaGetDevice(&dev));
+
+  const auto attr = [dev](cudaDeviceAttr a) {
+    int v = 0;
+    CUDA_CHECK(cudaDeviceGetAttribute(&v, a, dev));
+    return v;
+  };
+
+  cudaDeviceProp prop{};
+  CUDA_CHECK(cudaGetDeviceProperties(&prop, dev));
+
+  const int sms = attr(cudaDevAttrMultiProcessorCount);
+  const double ghz = attr(cudaDevAttrClockRate) * 1e-6;
+  // shortcut: 128 FP32 lanes/SM holds for cc 8.6, 8.9 and 12.x (cc 8.0 has 64), upgrade to a
+  // cc table if another GPU appears.
+  const double fp32_tflops = sms * 128 * 2 * ghz * 1e-3;
+  const double dram_gbs = 2.0 * attr(cudaDevAttrMemoryClockRate) * 1e3 *
+                          attr(cudaDevAttrGlobalMemoryBusWidth) / 8 / 1e9;
+
+  os << "[device: " << prop.name << ", cc " << prop.major << '.' << prop.minor << ", " << sms
+     << " SMs @ " << ghz << " GHz, L2 " << attr(cudaDevAttrL2CacheSize) / (1 << 20) << " MiB, "
+     << attr(cudaDevAttrMaxThreadsPerMultiProcessor) << " thr/SM, "
+     << attr(cudaDevAttrMaxBlocksPerMultiprocessor) << " blk/SM, smem/SM "
+     << attr(cudaDevAttrMaxSharedMemoryPerMultiprocessor) / 1024 << " KB, FP32 ~" << fp32_tflops
+     << " TFLOP/s, DRAM ~" << dram_gbs << " GB/s]\n";
+}
+
 struct Result {
   double best_ms;
   double rate;
