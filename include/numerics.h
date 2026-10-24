@@ -6,6 +6,8 @@
 #include <span>
 #include <vector>
 
+#include <cuda_bf16.h>
+
 namespace cul::numerics {
 
 inline std::vector<float> random_vector(int rows, int cols, int seed) {
@@ -18,6 +20,14 @@ inline std::vector<float> random_vector(int rows, int cols, int seed) {
     x = dist(gen);
   }
 
+  return out;
+}
+
+inline std::vector<__nv_bfloat16> to_bf16(const std::vector<float> &v) {
+  std::vector<__nv_bfloat16> out(v.size());
+  for (std::size_t i = 0; i < v.size(); ++i) {
+    out[i] = __float2bfloat16(v[i]);
+  }
   return out;
 }
 

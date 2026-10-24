@@ -40,6 +40,12 @@ target_compile_options(cul_base INTERFACE
 add_library(cul_cublas INTERFACE)
 target_link_libraries(cul_cublas INTERFACE CUDA::cublas)
 
+add_executable(hgemm
+    src/hgemm.cu
+    src/kernels/hgemm/cublas.cu
+)
+target_link_libraries(hgemm PRIVATE cul_base cul_cublas)
+
 add_executable(sgemm
     src/sgemm.cu
     src/kernels/sgemm/cublas.cu
