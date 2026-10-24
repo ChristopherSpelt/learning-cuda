@@ -7,10 +7,11 @@
 using namespace cul;
 
 int main(int argc, char **argv) {
-  bench::print_device_banner(std::cerr);
-
   const auto args = bench::parse_args(
       argc, argv, {1 << 10, 1 << 13, 1 << 16, 1 << 19, 1 << 22, 1 << 25, 1 << 27});
+
+  std::ostream &log = args.csv ? std::cerr : std::cout; // commentary never pollutes CSV stdout
+  bench::print_device_banner(log);
 
   constexpr SasumKernel registry[] = {
       {"cuBLAS", &kernels::sasum::cublas},
@@ -20,14 +21,17 @@ int main(int argc, char **argv) {
       {"warp reduce", &kernels::sasum::warp_reduce},
   };
 
+  const int width = bench::name_width(registry);
   if (args.csv)
     bench::print_csv_header(std::cout);
 
   for (int n : args.sizes) {
     SasumHarness harness(n);
+    harness.print_reference(log);
     for (const auto &k : registry) {
       const auto rec = harness.run(k);
-      args.csv ? bench::print_csv_row(std::cout, rec) : bench::print_table_row(std::cout, rec);
+      args.csv ? bench::print_csv_row(std::cout, rec)
+               : bench::print_table_row(std::cout, rec, width);
     }
   }
   return EXIT_SUCCESS;

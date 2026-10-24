@@ -34,12 +34,15 @@ public:
     kernels::sasum::cublas(ref_args);
     CUDA_CHECK(cudaDeviceSynchronize());
     result_ref_ = resultd_[0];
-
-    std::cerr << "[reference: cuBLAS sasum, n=" << n_ << "]\n\n";
   }
 
   SasumHarness(const SasumHarness &) = delete;
   SasumHarness &operator=(const SasumHarness &) = delete;
+
+  // Section header for this problem size; the blank line separates it from the previous block.
+  void print_reference(std::ostream &os) const {
+    os << "\n[reference: cuBLAS sasum, n=" << n_ << "]\n";
+  }
 
   bench::Record run(const SasumKernel &kernel) {
     auto *xd_ptr = thrust::raw_pointer_cast(xd_.data());

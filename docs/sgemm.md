@@ -115,7 +115,7 @@ memory-bound.
 
 #### Roofline
 
-![Roofline for RTX 3090](../figures/roofline.svg)
+![Roofline for RTX 3090](../figures/roofline_3090.svg)
 
 The diagonal (slope 1 on log-log axes) is the memory roof; its position
 is fixed by DRAM bandwidth. The horizontal dashed line is the peak FP32
@@ -125,7 +125,7 @@ $3072^3$ sits at AI ≈ 384, well past the ridge — the target is the
 35.58 TFLOP/s ceiling, not the bandwidth diagonal.
 
 ## Results
-![sgemm kernels](../figures/sgemm.png)
+![sgemm kernels (RTX 3090)](../figures/sgemm_3090.png)
 
 Results for $M=N=K=4096$.
 

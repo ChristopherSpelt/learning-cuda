@@ -49,8 +49,8 @@ TODO
 TODO
 
 ## Results
-![saxpy kernels](../figures/saxpy_batch.png)
-![saxpy kernels with flushed L2 cache](../figures/saxpy_cold.png)
+![saxpy kernels (RTX 3090)](../figures/saxpy_3090_batch.png)
+![saxpy kernels with flushed L2 cache (RTX 3090)](../figures/saxpy_3090_cold.png)
 
 
 ## Naive 

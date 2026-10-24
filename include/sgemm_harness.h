@@ -47,16 +47,18 @@ public:
     CUDA_CHECK(cudaDeviceSynchronize());
     thrust::copy(Cd_.begin(), Cd_.end(), C_ref_.begin());
 
-    const float ref_delta = numerics::relative_rmse(C_ref_, C_init_);
-
-    std::cerr << "[reference: cuBLAS pedantic, " << M_ << " x " << N_ << " x " << K_
-              << ", ref_delta " << ref_delta << "]\n\n";
-
-    CUL_REQUIRE(ref_delta > 2.0f, "degenerate reference data");
+    ref_delta_ = numerics::relative_rmse(C_ref_, C_init_);
+    CUL_REQUIRE(ref_delta_ > 2.0f, "degenerate reference data");
   }
 
   SgemmHarness(const SgemmHarness &) = delete;
   SgemmHarness &operator=(const SgemmHarness &) = delete;
+
+  // Section header for this problem size; the blank line separates it from the previous block.
+  void print_reference(std::ostream &os) const {
+    os << "\n[reference: cuBLAS pedantic, " << M_ << " x " << N_ << " x " << K_ << ", ref_delta "
+       << ref_delta_ << "]\n";
+  }
 
   bench::Record run(const SgemmKernel &kernel) {
     auto *Ad_ptr = thrust::raw_pointer_cast(Ad_.data());
@@ -100,6 +102,7 @@ private:
   static constexpr float kTolerance = 1e-3f;
 
   int M_, N_, K_;
+  float ref_delta_ = 0.0f;
   std::vector<float> A_, B_, C_init_, C_ref_, C_scratch_;
   thrust::device_vector<float> Ad_, Bd_, Cd_;
 };

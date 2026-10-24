@@ -34,12 +34,15 @@ public:
     kernels::saxpy::cublas(ref_args);
     CUDA_CHECK(cudaDeviceSynchronize());
     thrust::copy(yd_.begin(), yd_.end(), y_ref_.begin());
-
-    std::cerr << "[reference: cuBLAS saxpy, n=" << n_ << "]\n\n";
   }
 
   SaxpyHarness(const SaxpyHarness &) = delete;
   SaxpyHarness &operator=(const SaxpyHarness &) = delete;
+
+  // Section header for this problem size; the blank line separates it from the previous block.
+  void print_reference(std::ostream &os) const {
+    os << "\n[reference: cuBLAS saxpy, n=" << n_ << "]\n";
+  }
 
   bench::Record run(const SaxpyKernel &kernel) {
     auto *xd_ptr = thrust::raw_pointer_cast(xd_.data());

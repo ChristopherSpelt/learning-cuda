@@ -113,22 +113,26 @@ inline void print_device_banner(std::ostream &os) {
   };
 
   cudaDeviceProp prop{};
-  CUDA_CHECK(cudaGetDeviceProperties(&prop, dev));
+  CUDA_CHECK(cudaGetDeviceProperties(&prop, dev)); // heavy, once, for the name only
 
-  const int sms = attr(cudaDevAttrMultiProcessorCount);
-  const double ghz = attr(cudaDevAttrClockRate) * 1e-6;
-  // shortcut: 128 FP32 lanes/SM holds for cc 8.6, 8.9 and 12.x (cc 8.0 has 64), upgrade to a
-  // cc table if another GPU appears.
-  const double fp32_tflops = sms * 128 * 2 * ghz * 1e-3;
-  const double dram_gbs = 2.0 * attr(cudaDevAttrMemoryClockRate) * 1e3 *
-                          attr(cudaDevAttrGlobalMemoryBusWidth) / 8 / 1e9;
-
-  os << "[device: " << prop.name << ", cc " << prop.major << '.' << prop.minor << ", " << sms
-     << " SMs @ " << ghz << " GHz, L2 " << attr(cudaDevAttrL2CacheSize) / (1 << 20) << " MiB, "
+  // Reported attributes only. The memory clock's DDR convention differs per memory type
+  // (GDDR6X reports half the data rate, LPDDR5x the full rate), so no derived GB/s.
+  os << "[device: " << prop.name << ", cc " << prop.major << '.' << prop.minor << ", "
+     << attr(cudaDevAttrMultiProcessorCount) << " SMs @ " << attr(cudaDevAttrClockRate) / 1000
+     << " MHz, L2 " << attr(cudaDevAttrL2CacheSize) / (1 << 20) << " MiB, "
      << attr(cudaDevAttrMaxThreadsPerMultiProcessor) << " thr/SM, "
-     << attr(cudaDevAttrMaxBlocksPerMultiprocessor) << " blk/SM, smem/SM "
-     << attr(cudaDevAttrMaxSharedMemoryPerMultiprocessor) / 1024 << " KB, FP32 ~" << fp32_tflops
-     << " TFLOP/s, DRAM ~" << dram_gbs << " GB/s]\n";
+     << attr(cudaDevAttrMaxBlocksPerMultiprocessor) << " blk/SM, "
+     << attr(cudaDevAttrMaxSharedMemoryPerMultiprocessor) / 1024 << " KB smem/SM, mem "
+     << attr(cudaDevAttrMemoryClockRate) / 1000 << " MHz x "
+     << attr(cudaDevAttrGlobalMemoryBusWidth) << "-bit]\n";
+}
+
+// Widest registered kernel name, so the table's name column fits whatever is registered.
+template <typename Registry> [[nodiscard]] int name_width(const Registry &registry) {
+  std::size_t w = 0;
+  for (const auto &k : registry)
+    w = std::max(w, k.name.size());
+  return int(w);
 }
 
 struct Result {
@@ -236,9 +240,9 @@ inline void print_csv_row(std::ostream &os, const Record &r) {
   os << '\n';
 }
 
-inline void print_table_row(std::ostream &os, const Record &r) {
-  os << std::left << std::setw(22) << r.name << std::right << "  rel_err " << std::scientific
-     << std::setprecision(2) << r.rel_err;
+inline void print_table_row(std::ostream &os, const Record &r, int name_width) {
+  os << std::left << std::setw(name_width) << r.name << std::right << "  rel_err "
+     << std::scientific << std::setprecision(2) << r.rel_err;
   if (!r.passed) {
     os << "  FAILED\n";
     return;
