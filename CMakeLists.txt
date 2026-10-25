@@ -8,6 +8,9 @@ endif()
 
 project(learning_cuda LANGUAGES CXX CUDA)
 
+# clangd cannot read nvcc respone files; keep =I flags inline in compile_commands.json
+set(CMAKE_CUDA_USE_RESPONSE_FILE_FOR_INCLUDES OFF)
+
 # Default to Release
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
