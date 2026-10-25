@@ -33,7 +33,7 @@ int main(int argc, char **argv) {
 
   bool ok = true;
   for (int n : args.sizes) {
-    SgemmHarness harness(n);
+    SgemmHarness harness(n, n, n);
     harness.print_reference(log);
     for (const auto &k : registry) {
       const auto rec = harness.run(k);
