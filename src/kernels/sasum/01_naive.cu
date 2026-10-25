@@ -20,7 +20,7 @@ void kernels::sasum::naive(const SasumArgs &a) {
   constexpr int BLOCKSIZE = 256;
 
   dim3 block(BLOCKSIZE);
-  dim3 grid(cuda_utils::ceil_div(a.n, BLOCKSIZE));
+  dim3 grid(cuda::ceil_div(a.n, BLOCKSIZE));
 
   naive_kernel<<<grid, block>>>(a.n, a.x, a.result);
   CUDA_CHECK_LAUNCH();

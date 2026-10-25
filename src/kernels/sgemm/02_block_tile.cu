@@ -77,7 +77,7 @@ void kernels::sgemm::block_tile(const SgemmArgs &a) {
   constexpr int BLOCKSIZE = 32;
 
   dim3 block(BLOCKSIZE * BLOCKSIZE);
-  dim3 grid(cuda_utils::ceil_div(a.N, BLOCKSIZE), cuda_utils::ceil_div(a.M, BLOCKSIZE));
+  dim3 grid(cuda::ceil_div(a.N, BLOCKSIZE), cuda::ceil_div(a.M, BLOCKSIZE));
 
   if (a.beta == 0.0f) {
     block_tile_kernel<BLOCKSIZE, true>

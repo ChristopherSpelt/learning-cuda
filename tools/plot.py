@@ -28,7 +28,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 
 # The CSV rate columns are unit-agnostic, so infer the unit from the family name.
-UNITS_BY_FAMILY = {"sgemm": "TFLOP/s", "saxpy": "GB/s", "sasum": "GB/s"}
+UNITS_BY_FAMILY = {"sgemm": "TFLOP/s", "saxpy": "GB/s", "sasum": "GB/s", "hgemm": "TFLOP/s"}
 
 
 def family_of(path: Path) -> str:

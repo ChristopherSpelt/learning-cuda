@@ -32,7 +32,7 @@ target_compile_options(cul_base INTERFACE
     -Xcompiler=-Wall,-Wextra,-Werror
     -Werror=cross-execution-space-call
     --expt-relaxed-constexpr
-    -Xptxas=-warn-spills
+    -Xptxas=-warn-spills,-warn-lmem-usage,-Werror
     -lineinfo
     >
 )

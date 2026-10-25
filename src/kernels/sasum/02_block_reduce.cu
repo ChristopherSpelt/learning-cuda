@@ -43,7 +43,7 @@ void kernels::sasum::block_reduce(const SasumArgs &a) {
   constexpr int BLOCKSIZE = 256;
 
   dim3 block(BLOCKSIZE);
-  dim3 grid(cuda_utils::ceil_div(a.n, BLOCKSIZE));
+  dim3 grid(cuda::ceil_div(a.n, BLOCKSIZE));
 
   block_reduce_kernel<BLOCKSIZE><<<grid, block>>>(a.n, a.x, a.result);
   CUDA_CHECK_LAUNCH();

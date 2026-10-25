@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <cuda_runtime.h>
+#include <cuda/cmath>
 #include <iostream>
 #include <type_traits>
 
@@ -40,12 +41,6 @@ inline void check(cudaError_t code, const char *file, int line) {
   std::cerr << "Requirement failed: " << cond << " (" << msg << ") at " << file << ":" << line
             << "\n";
   std::exit(EXIT_FAILURE);
-}
-
-// Written so that it cannot overflow near the type max. Only valid for non-negative a and positive
-// b.
-template <typename A, typename B> [[nodiscard]] constexpr auto ceil_div(A a, B b) {
-  return a / b + (a % b != 0);
 }
 
 template <typename F> inline void dispatch_bool(bool b, F &&f) {

@@ -40,7 +40,7 @@ void kernels::sgemm::naive(const SgemmArgs &a) {
   constexpr int BLOCKSIZE = 32;
 
   dim3 block(BLOCKSIZE * BLOCKSIZE);
-  dim3 grid(cuda_utils::ceil_div(a.N, BLOCKSIZE), cuda_utils::ceil_div(a.M, BLOCKSIZE));
+  dim3 grid(cuda::ceil_div(a.N, BLOCKSIZE), cuda::ceil_div(a.M, BLOCKSIZE));
 
   if (a.beta == 0.0f) {
     naive_kernel<BLOCKSIZE, true><<<grid, block>>>(a.M, a.N, a.K, a.alpha, a.A, a.B, a.beta, a.C);

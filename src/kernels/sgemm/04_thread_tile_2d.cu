@@ -129,7 +129,7 @@ void kernels::sgemm::thread_tile_2d(const SgemmArgs &a) {
   constexpr int NUM_THREADS = (BM * BN) / (TM * TN);
 
   dim3 block(NUM_THREADS);
-  dim3 grid(cuda_utils::ceil_div(a.N, BN), cuda_utils::ceil_div(a.M, BM));
+  dim3 grid(cuda::ceil_div(a.N, BN), cuda::ceil_div(a.M, BM));
 
   if (a.beta == 0.0f) {
     thread_tile_2d_kernel<BM, BK, BN, TM, TN, true>

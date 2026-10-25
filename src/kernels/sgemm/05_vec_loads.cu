@@ -149,7 +149,7 @@ void kernels::sgemm::vec_loads(const SgemmArgs &a) {
   const bool beta_is_zero = a.beta == 0.0f;
 
   dim3 block(NUM_THREADS);
-  dim3 grid(cuda_utils::ceil_div(a.N, BN), cuda_utils::ceil_div(a.M, BM));
+  dim3 grid(cuda::ceil_div(a.N, BN), cuda::ceil_div(a.M, BM));
 
   cuda_utils::dispatch_bool(beta_is_zero, [&](auto beta_zero) {
     cuda_utils::dispatch_bool(!tile_aligned, [&](auto bounds_check) {

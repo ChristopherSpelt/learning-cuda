@@ -22,7 +22,7 @@ void kernels::saxpy::naive(const SaxpyArgs &a) {
   constexpr int BLOCKSIZE = 1024;
 
   dim3 block(BLOCKSIZE);
-  dim3 grid(cuda_utils::ceil_div(a.n, BLOCKSIZE));
+  dim3 grid(cuda::ceil_div(a.n, BLOCKSIZE));
 
   naive_kernel<<<grid, block>>>(a.n, a.alpha, a.x, a.y);
   CUDA_CHECK_LAUNCH();
