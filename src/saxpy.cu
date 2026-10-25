@@ -24,14 +24,16 @@ int main(int argc, char **argv) {
   if (args.csv)
     bench::print_csv_header(std::cout);
 
+  bool ok = true;
   for (int n : args.sizes) {
     SaxpyHarness harness(n);
     harness.print_reference(log);
     for (const auto &k : registry) {
       const auto rec = harness.run(k);
+      ok = ok && rec.passed;
       args.csv ? bench::print_csv_row(std::cout, rec)
                : bench::print_table_row(std::cout, rec, width);
     }
   }
-  return EXIT_SUCCESS;
+  return ok ? EXIT_SUCCESS : EXIT_FAILURE;
 }
