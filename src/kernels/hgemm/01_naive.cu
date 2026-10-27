@@ -16,15 +16,12 @@ __global__ void naive_kernel(int M, int N, int K, float alpha, const __nv_bfloat
   const int row = blockIdx.y * 16;
   const int col = blockIdx.x * 16;
 
-  if (row >= M || col >= N)
-    return;
-
+  // Declare the fragments
   wmma::fragment<wmma::matrix_a, 16, 16, 16, __nv_bfloat16, wmma::row_major> A_frag;
   wmma::fragment<wmma::matrix_b, 16, 16, 16, __nv_bfloat16, wmma::row_major> B_frag;
   wmma::fragment<wmma::accumulator, 16, 16, 16, float> acc_frag;
   wmma::fragment<wmma::accumulator, 16, 16, 16, float> C_frag;
 
-  // Initialize the output to zero
   wmma::fill_fragment(acc_frag, 0.0f);
 
   // ---- Main loop -----------------------------------------------------------
@@ -37,6 +34,11 @@ __global__ void naive_kernel(int M, int N, int K, float alpha, const __nv_bfloat
     wmma::mma_sync(acc_frag, A_frag, B_frag, acc_frag);
   }
 
+  // Load in the current value of C, scale it by beta, and add this to our result scaled by alpha.
+  //
+  // The accumulator fragment is 16x16 and is logically and physically stored in the registers of
+  // the lanes. Since there are 32 lanes, each lane has 16*16/32=8 values of the accumulator
+  // fragment. We don't know where each value is stored, but we do not need to know.
   if constexpr (BetaIsZero) {
     for (int i = 0; i < C_frag.num_elements; ++i) {
       C_frag.x[i] = alpha * acc_frag.x[i];
@@ -56,6 +58,9 @@ __global__ void naive_kernel(int M, int N, int K, float alpha, const __nv_bfloat
 } // namespace
 
 void kernels::hgemm::naive(const HgemmArgs &a) {
+  CUL_REQUIRE(a.M % 16 == 0 && a.N % 16 == 0 && a.K % 16 == 0,
+              "wmma kernel needs M, N and K to be multiples of 16.");
+
   dim3 block(32);
   dim3 grid(cuda::ceil_div(a.N, 16), cuda::ceil_div(a.M, 16));
 
