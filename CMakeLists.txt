@@ -46,6 +46,7 @@ target_link_libraries(cul_cublas INTERFACE CUDA::cublas)
 add_executable(hgemm
     src/hgemm.cu
     src/kernels/hgemm/cublas.cu
+    src/kernels/hgemm/01_naive.cu
 )
 target_link_libraries(hgemm PRIVATE cul_base cul_cublas)
 

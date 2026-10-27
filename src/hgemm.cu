@@ -15,6 +15,7 @@ int main(int argc, char **argv) {
 
   constexpr HgemmKernel registry[] = {
       {"cuBLAS (default)", &kernels::hgemm::cublas_default},
+      {"naive", &kernels::hgemm::naive},
   };
 
   const int width = bench::name_width(registry);
